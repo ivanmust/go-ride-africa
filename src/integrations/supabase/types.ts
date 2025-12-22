@@ -14,16 +14,183 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ride_history: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          currency: string | null
+          distance_km: number | null
+          driver_name: string | null
+          driver_photo: string | null
+          driver_rating: number | null
+          dropoff_address: string
+          dropoff_lat: number | null
+          dropoff_lng: number | null
+          duration_minutes: number | null
+          fare_amount: number
+          id: string
+          pickup_address: string
+          pickup_lat: number | null
+          pickup_lng: number | null
+          started_at: string | null
+          status: string
+          user_feedback: string | null
+          user_id: string
+          user_rating: number | null
+          vehicle_plate: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          currency?: string | null
+          distance_km?: number | null
+          driver_name?: string | null
+          driver_photo?: string | null
+          driver_rating?: number | null
+          dropoff_address: string
+          dropoff_lat?: number | null
+          dropoff_lng?: number | null
+          duration_minutes?: number | null
+          fare_amount: number
+          id?: string
+          pickup_address: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          started_at?: string | null
+          status?: string
+          user_feedback?: string | null
+          user_id: string
+          user_rating?: number | null
+          vehicle_plate?: string | null
+          vehicle_type: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          currency?: string | null
+          distance_km?: number | null
+          driver_name?: string | null
+          driver_photo?: string | null
+          driver_rating?: number | null
+          dropoff_address?: string
+          dropoff_lat?: number | null
+          dropoff_lng?: number | null
+          duration_minutes?: number | null
+          fare_amount?: number
+          id?: string
+          pickup_address?: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          started_at?: string | null
+          status?: string
+          user_feedback?: string | null
+          user_id?: string
+          user_rating?: number | null
+          vehicle_plate?: string | null
+          vehicle_type?: string
+        }
+        Relationships: []
+      }
+      saved_locations: {
+        Row: {
+          address: string
+          created_at: string
+          id: string
+          label: string | null
+          latitude: number | null
+          longitude: number | null
+          name: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          user_id: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "driver" | "passenger"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +317,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "driver", "passenger"],
+    },
   },
 } as const
