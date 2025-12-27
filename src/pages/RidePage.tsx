@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
+import { MapboxMap } from "@/components/maps/MapboxMap";
 import {
   MapPin,
   Navigation,
@@ -17,6 +18,7 @@ import {
   ChevronRight,
   X,
   User,
+  Crosshair,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Helmet } from "react-helmet-async";
@@ -31,9 +33,9 @@ const vehicleTypes = [
 ];
 
 const recentLocations = [
-  { name: "Home", address: "KG 123 St, Kigali", icon: "🏠" },
-  { name: "Office", address: "KN 5 Ave, Downtown", icon: "🏢" },
-  { name: "Kigali Convention Centre", address: "KN 2 Ave", icon: "📍" },
+  { name: "Home", address: "KG 123 St, Kigali", icon: "🏠", lat: -1.9441, lng: 30.0619 },
+  { name: "Office", address: "KN 5 Ave, Downtown", icon: "🏢", lat: -1.9520, lng: 30.0588 },
+  { name: "Kigali Convention Centre", address: "KN 2 Ave", icon: "📍", lat: -1.9536, lng: 30.0920 },
 ];
 
 export const RidePage = () => {
@@ -41,16 +43,106 @@ export const RidePage = () => {
   const [pickup, setPickup] = useState("");
   const [destination, setDestination] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState("economy");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [isLocatingUser, setIsLocatingUser] = useState(false);
+
+  // Get user's current location
+  const getCurrentLocation = () => {
+    setIsLocatingUser(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const coords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setPickupCoords(coords);
+          setPickup("Current location");
+          setIsLocatingUser(false);
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          setIsLocatingUser(false);
+          // Default to Kigali center
+          setPickupCoords({ lat: -1.9441, lng: 30.0619 });
+          setPickup("Kigali City Center");
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+  };
 
   const handleRequestRide = () => {
     setRideState("searching");
-    setTimeout(() => setRideState("matched"), 2000);
+    
+    // Simulate driver matching after 2 seconds
+    setTimeout(() => {
+      setRideState("matched");
+      // Place driver somewhere near pickup
+      if (pickupCoords) {
+        setDriverLocation({
+          lat: pickupCoords.lat + 0.008,
+          lng: pickupCoords.lng + 0.005,
+        });
+      }
+    }, 2000);
   };
 
   const simulateRideProgress = () => {
     setRideState("arriving");
-    setTimeout(() => setRideState("riding"), 3000);
-    setTimeout(() => setRideState("completed"), 8000);
+    
+    // Animate driver towards pickup
+    const interval = setInterval(() => {
+      setDriverLocation((prev) => {
+        if (!prev || !pickupCoords) return prev;
+        const latDiff = pickupCoords.lat - prev.lat;
+        const lngDiff = pickupCoords.lng - prev.lng;
+        
+        if (Math.abs(latDiff) < 0.0005 && Math.abs(lngDiff) < 0.0005) {
+          clearInterval(interval);
+          // Driver arrived, start riding
+          setTimeout(() => {
+            setRideState("riding");
+            simulateRiding();
+          }, 1000);
+          return pickupCoords;
+        }
+        
+        return {
+          lat: prev.lat + latDiff * 0.2,
+          lng: prev.lng + lngDiff * 0.2,
+        };
+      });
+    }, 500);
+  };
+
+  const simulateRiding = () => {
+    // Animate driver from pickup to destination
+    const interval = setInterval(() => {
+      setDriverLocation((prev) => {
+        if (!prev || !destinationCoords) return prev;
+        const latDiff = destinationCoords.lat - prev.lat;
+        const lngDiff = destinationCoords.lng - prev.lng;
+        
+        if (Math.abs(latDiff) < 0.001 && Math.abs(lngDiff) < 0.001) {
+          clearInterval(interval);
+          setRideState("completed");
+          return destinationCoords;
+        }
+        
+        return {
+          lat: prev.lat + latDiff * 0.1,
+          lng: prev.lng + lngDiff * 0.1,
+        };
+      });
+    }, 800);
+  };
+
+  const handleLocationSelect = (location: typeof recentLocations[0]) => {
+    setDestination(location.address);
+    setDestinationCoords({ lat: location.lat, lng: location.lng });
   };
 
   return (
@@ -66,62 +158,14 @@ export const RidePage = () => {
         <main className="pt-16">
           <div className="grid lg:grid-cols-[1fr,400px] min-h-[calc(100vh-64px)]">
             {/* Map Area */}
-            <div className="relative bg-gradient-to-br from-goride-green-light via-secondary to-goride-amber-light order-2 lg:order-1">
-              {/* Simulated Map */}
-              <div className="absolute inset-0">
-                {/* Grid pattern */}
-                <div className="absolute inset-0 opacity-10">
-                  {[...Array(20)].map((_, i) => (
-                    <div key={`h-${i}`} className="absolute w-full h-px bg-foreground" style={{ top: `${i * 5}%` }} />
-                  ))}
-                  {[...Array(20)].map((_, i) => (
-                    <div key={`v-${i}`} className="absolute h-full w-px bg-foreground" style={{ left: `${i * 5}%` }} />
-                  ))}
-                </div>
-
-                {/* Roads */}
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  <path d="M10 50 Q50 20 90 50" stroke="hsl(var(--primary))" strokeWidth="0.5" fill="none" strokeDasharray="2 1" />
-                  <path d="M30 10 Q50 50 30 90" stroke="hsl(var(--primary))" strokeWidth="0.5" fill="none" strokeDasharray="2 1" />
-                  <path d="M70 20 Q60 50 70 80" stroke="hsl(var(--primary))" strokeWidth="0.5" fill="none" strokeDasharray="2 1" />
-                </svg>
-
-                {/* Pickup Marker */}
-                {pickup && (
-                  <div className="absolute top-1/3 left-1/3 transform -translate-x-1/2 -translate-y-1/2 z-10">
-                    <div className="relative">
-                      <div className="absolute -inset-4 bg-primary/20 rounded-full pulse-ring" />
-                      <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                        <MapPin className="w-5 h-5 text-primary-foreground" />
-                      </div>
-                      <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-card px-3 py-1 rounded-lg shadow-md text-sm font-medium">
-                        Pickup
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Destination Marker */}
-                {destination && (
-                  <div className="absolute bottom-1/3 right-1/3 transform translate-x-1/2 translate-y-1/2 z-10">
-                    <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center shadow-lg">
-                      <Navigation className="w-5 h-5 text-accent-foreground" />
-                    </div>
-                    <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-card px-3 py-1 rounded-lg shadow-md text-sm font-medium">
-                      Destination
-                    </div>
-                  </div>
-                )}
-
-                {/* Driver Car (when matched) */}
-                {(rideState === "matched" || rideState === "arriving") && (
-                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-car-move z-20">
-                    <div className="bg-foreground text-background w-12 h-12 rounded-xl flex items-center justify-center shadow-xl">
-                      <Car className="w-6 h-6" />
-                    </div>
-                  </div>
-                )}
-              </div>
+            <div className="relative order-2 lg:order-1">
+              <MapboxMap
+                pickup={pickupCoords}
+                destination={destinationCoords}
+                driverLocation={driverLocation}
+                showRoute={!!pickupCoords && !!destinationCoords}
+                className="absolute inset-0"
+              />
 
               {/* Ride Status Overlays */}
               {rideState === "searching" && (
@@ -167,7 +211,14 @@ export const RidePage = () => {
                       </div>
                     </div>
 
-                    <Button variant="goride" className="w-full" onClick={() => setRideState("booking")}>
+                    <Button variant="goride" className="w-full" onClick={() => {
+                      setRideState("booking");
+                      setPickupCoords(null);
+                      setDestinationCoords(null);
+                      setDriverLocation(null);
+                      setPickup("");
+                      setDestination("");
+                    }}>
                       Book Another Ride
                     </Button>
                   </div>
@@ -193,8 +244,12 @@ export const RidePage = () => {
                         onChange={(e) => setPickup(e.target.value)}
                         className="w-full pl-10 pr-12 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                       />
-                      <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-background rounded-lg transition-colors">
-                        <Navigation className="w-5 h-5 text-primary" />
+                      <button 
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-background rounded-lg transition-colors"
+                        onClick={getCurrentLocation}
+                        disabled={isLocatingUser}
+                      >
+                        <Crosshair className={cn("w-5 h-5 text-primary", isLocatingUser && "animate-pulse")} />
                       </button>
                     </div>
 
@@ -211,14 +266,14 @@ export const RidePage = () => {
                   </div>
 
                   {/* Recent Locations */}
-                  {!destination && (
+                  {!destinationCoords && (
                     <div>
                       <h3 className="text-sm font-medium text-muted-foreground mb-3">Recent</h3>
                       <div className="space-y-2">
                         {recentLocations.map((location) => (
                           <button
                             key={location.name}
-                            onClick={() => setDestination(location.address)}
+                            onClick={() => handleLocationSelect(location)}
                             className="w-full flex items-center gap-3 p-3 bg-secondary hover:bg-secondary/80 rounded-xl transition-colors text-left"
                           >
                             <span className="text-xl">{location.icon}</span>
@@ -234,7 +289,7 @@ export const RidePage = () => {
                   )}
 
                   {/* Vehicle Selection */}
-                  {destination && (
+                  {destinationCoords && (
                     <>
                       <div>
                         <h3 className="text-sm font-medium text-muted-foreground mb-3">Choose a ride</h3>
@@ -286,6 +341,7 @@ export const RidePage = () => {
                         size="xl"
                         className="w-full"
                         onClick={handleRequestRide}
+                        disabled={!pickupCoords}
                       >
                         Request {vehicleTypes.find(v => v.id === selectedVehicle)?.name}
                       </Button>
@@ -306,7 +362,10 @@ export const RidePage = () => {
                         {rideState === "matched" ? "3 min away" : "Almost there"}
                       </p>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => setRideState("booking")}>
+                    <Button variant="ghost" size="icon" onClick={() => {
+                      setRideState("booking");
+                      setDriverLocation(null);
+                    }}>
                       <X className="w-5 h-5" />
                     </Button>
                   </div>
@@ -411,7 +470,7 @@ export const RidePage = () => {
                       <div className="font-medium text-foreground">Emmanuel N.</div>
                       <div className="text-sm text-muted-foreground">Toyota Corolla</div>
                     </div>
-                    <Button variant="ghost" size="icon-sm">
+                    <Button variant="ghost" size="icon">
                       <Phone className="w-4 h-4" />
                     </Button>
                   </div>
