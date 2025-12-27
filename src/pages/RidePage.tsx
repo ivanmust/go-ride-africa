@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
 import { MapboxMap } from "@/components/maps/MapboxMap";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import {
   MapPin,
   Navigation,
@@ -235,34 +236,30 @@ export const RidePage = () => {
 
                   {/* Location Inputs */}
                   <div className="space-y-3">
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full" />
-                      <input
-                        type="text"
-                        placeholder="Enter pickup location"
-                        value={pickup}
-                        onChange={(e) => setPickup(e.target.value)}
-                        className="w-full pl-10 pr-12 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                      <button 
-                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-background rounded-lg transition-colors"
-                        onClick={getCurrentLocation}
-                        disabled={isLocatingUser}
-                      >
-                        <Crosshair className={cn("w-5 h-5 text-primary", isLocatingUser && "animate-pulse")} />
-                      </button>
-                    </div>
+                    <AddressAutocomplete
+                      value={pickup}
+                      onChange={setPickup}
+                      onSelect={(result) => {
+                        setPickup(result.address);
+                        setPickupCoords({ lat: result.lat, lng: result.lng });
+                      }}
+                      placeholder="Enter pickup location"
+                      variant="pickup"
+                      showCurrentLocation
+                      onCurrentLocation={getCurrentLocation}
+                      isLocating={isLocatingUser}
+                    />
 
-                    <div className="relative">
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-sm" />
-                      <input
-                        type="text"
-                        placeholder="Where to?"
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        className="w-full pl-10 pr-4 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                    </div>
+                    <AddressAutocomplete
+                      value={destination}
+                      onChange={setDestination}
+                      onSelect={(result) => {
+                        setDestination(result.address);
+                        setDestinationCoords({ lat: result.lat, lng: result.lng });
+                      }}
+                      placeholder="Where to?"
+                      variant="destination"
+                    />
                   </div>
 
                   {/* Recent Locations */}
