@@ -5,6 +5,9 @@ import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
 import { MapboxMap } from "@/components/maps/MapboxMap";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
+import { useSavedLocations } from "@/hooks/useSavedLocations";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   MapPin,
   Navigation,
@@ -21,6 +24,9 @@ import {
   X,
   User,
   Crosshair,
+  Plus,
+  Heart,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Helmet } from "react-helmet-async";
@@ -40,15 +46,11 @@ const vehicleTypes = [
   { id: "xl", name: "XL", icon: Truck, price: "RWF 1,800", time: "7 min", description: "Extra space for groups" },
 ];
 
-const recentLocations = [
-  { name: "Home", address: "KG 123 St, Kigali", icon: "🏠", lat: -1.9441, lng: 30.0619 },
-  { name: "Office", address: "KN 5 Ave, Downtown", icon: "🏢", lat: -1.9520, lng: 30.0588 },
-  { name: "Kigali Convention Centre", address: "KN 2 Ave", icon: "📍", lat: -1.9536, lng: 30.0920 },
-];
-
 export const RidePage = () => {
   const location = useLocation();
   const locationState = location.state as LocationState | null;
+  const { user } = useAuth();
+  const { locations: savedLocations, isLoading: isLoadingLocations, saveLocation, deleteLocation, getLocationIcon } = useSavedLocations();
 
   const [rideState, setRideState] = useState<RideState>("booking");
   const [pickup, setPickup] = useState(locationState?.pickup?.address || "");
@@ -62,6 +64,8 @@ export const RidePage = () => {
   );
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocatingUser, setIsLocatingUser] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -155,9 +159,18 @@ export const RidePage = () => {
     }, 800);
   };
 
-  const handleLocationSelect = (location: typeof recentLocations[0]) => {
-    setDestination(location.address);
-    setDestinationCoords({ lat: location.lat, lng: location.lng });
+  const handleSavedLocationSelect = (loc: { name: string; address: string; latitude: number | null; longitude: number | null }) => {
+    if (loc.latitude && loc.longitude) {
+      setDestination(loc.address);
+      setDestinationCoords({ lat: loc.latitude, lng: loc.longitude });
+    }
+  };
+
+  const handleSaveDestination = () => {
+    if (destinationCoords && destination) {
+      setLocationToSave({ address: destination, coords: destinationCoords });
+      setSaveDialogOpen(true);
+    }
   };
 
   return (
@@ -276,26 +289,64 @@ export const RidePage = () => {
                     />
                   </div>
 
-                  {/* Recent Locations */}
+                  {/* Saved Locations */}
                   {!destinationCoords && (
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-3">Recent</h3>
-                      <div className="space-y-2">
-                        {recentLocations.map((location) => (
-                          <button
-                            key={location.name}
-                            onClick={() => handleLocationSelect(location)}
-                            className="w-full flex items-center gap-3 p-3 bg-secondary hover:bg-secondary/80 rounded-xl transition-colors text-left"
-                          >
-                            <span className="text-xl">{location.icon}</span>
-                            <div className="flex-1">
-                              <div className="font-medium text-foreground">{location.name}</div>
-                              <div className="text-sm text-muted-foreground">{location.address}</div>
-                            </div>
-                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                          </button>
-                        ))}
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium text-muted-foreground">
+                          {user ? "Saved Places" : "Quick Access"}
+                        </h3>
+                        {user && savedLocations.length > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            {savedLocations.length} saved
+                          </span>
+                        )}
                       </div>
+                      
+                      {isLoadingLocations ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      ) : savedLocations.length > 0 ? (
+                        <div className="space-y-2">
+                          {savedLocations.map((loc) => (
+                            <div
+                              key={loc.id}
+                              className="flex items-center gap-3 p-3 bg-secondary hover:bg-secondary/80 rounded-xl transition-colors group"
+                            >
+                              <button
+                                onClick={() => handleSavedLocationSelect(loc)}
+                                className="flex items-center gap-3 flex-1 text-left"
+                              >
+                                <span className="text-xl">{getLocationIcon(loc.label)}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-foreground">{loc.name}</div>
+                                  <div className="text-sm text-muted-foreground truncate">{loc.address}</div>
+                                </div>
+                              </button>
+                              <button
+                                onClick={() => deleteLocation(loc.id)}
+                                className="p-2 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 rounded-lg transition-all"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : user ? (
+                        <div className="text-center py-6 bg-secondary/50 rounded-xl">
+                          <Heart className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">No saved places yet</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Search for a destination to save it
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6 bg-secondary/50 rounded-xl">
+                          <MapPin className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-sm text-muted-foreground">Sign in to save places</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -334,6 +385,17 @@ export const RidePage = () => {
                           ))}
                         </div>
                       </div>
+
+                      {/* Save Destination Button */}
+                      {user && (
+                        <button
+                          onClick={handleSaveDestination}
+                          className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Save this destination
+                        </button>
+                      )}
 
                       {/* Payment Method */}
                       <div className="flex items-center justify-between p-4 bg-secondary rounded-xl">
@@ -503,6 +565,17 @@ export const RidePage = () => {
           </div>
         </main>
       </div>
+
+      {/* Save Location Dialog */}
+      {locationToSave && (
+        <SaveLocationDialog
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          address={locationToSave.address}
+          coordinates={locationToSave.coords}
+          onSave={saveLocation}
+        />
+      )}
     </>
   );
 };
