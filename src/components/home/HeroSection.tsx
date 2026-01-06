@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MapPin, Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
+import { Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MapboxMap } from "@/components/maps/MapboxMap";
+import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 
 const vehicleTypes = [
   { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min" },
@@ -13,7 +15,7 @@ const vehicleTypes = [
 
 // Route waypoints from pickup to destination for smooth animation
 const routeWaypoints = [
-  { lat: -1.9403, lng: 29.8739 },  // Start - Kigali center
+  { lat: -1.9403, lng: 29.8739 },
   { lat: -1.9420, lng: 29.8900 },
   { lat: -1.9450, lng: 29.9100 },
   { lat: -1.9480, lng: 29.9300 },
@@ -21,25 +23,76 @@ const routeWaypoints = [
   { lat: -1.9520, lng: 29.9800 },
   { lat: -1.9530, lng: 30.0100 },
   { lat: -1.9535, lng: 30.0350 },
-  { lat: -1.9536, lng: 30.0606 },  // End - Kigali Airport
+  { lat: -1.9536, lng: 30.0606 },
 ];
 
 export const HeroSection = () => {
+  const navigate = useNavigate();
   const [pickupInput, setPickupInput] = useState("");
   const [destinationInput, setDestinationInput] = useState("");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState("economy");
   const [driverPosition, setDriverPosition] = useState(0);
+  const [isLocating, setIsLocating] = useState(false);
 
   // Animate driver along the route
   useEffect(() => {
     const interval = setInterval(() => {
       setDriverPosition((prev) => (prev + 1) % routeWaypoints.length);
-    }, 2000); // Move every 2 seconds
-
+    }, 2000);
     return () => clearInterval(interval);
   }, []);
 
   const driverLocation = routeWaypoints[driverPosition];
+
+  const handleCurrentLocation = () => {
+    setIsLocating(true);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setPickupCoords({ lat: latitude, lng: longitude });
+          
+          // Reverse geocode to get address
+          try {
+            const response = await fetch(
+              `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN || ""}`
+            );
+            const data = await response.json();
+            if (data.features?.[0]) {
+              setPickupInput(data.features[0].place_name);
+            } else {
+              setPickupInput(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+            }
+          } catch {
+            setPickupInput(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+          setIsLocating(false);
+        },
+        () => {
+          setIsLocating(false);
+        }
+      );
+    } else {
+      setIsLocating(false);
+    }
+  };
+
+  const handleRequestRide = () => {
+    if (pickupCoords && destinationCoords) {
+      // Navigate to ride page with location data
+      navigate("/ride", {
+        state: {
+          pickup: { ...pickupCoords, address: pickupInput },
+          destination: { ...destinationCoords, address: destinationInput },
+          vehicleType: selectedVehicle,
+        },
+      });
+    }
+  };
+
+  const canRequestRide = pickupCoords && destinationCoords;
 
   return (
     <section className="relative min-h-screen pt-16 overflow-hidden gradient-hero">
@@ -88,32 +141,30 @@ export const HeroSection = () => {
             {/* Booking Card */}
             <div className="bg-card rounded-2xl shadow-card p-6 border border-border">
               <div className="space-y-4">
-                {/* Pickup Input */}
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full" />
-                  <input
-                    type="text"
-                    placeholder="Enter pickup location"
-                    value={pickupInput}
-                    onChange={(e) => setPickupInput(e.target.value)}
-                    className="w-full pl-10 pr-12 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                  <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-background rounded-lg transition-colors">
-                    <Navigation className="w-5 h-5 text-primary" />
-                  </button>
-                </div>
+                {/* Pickup Input with Autocomplete */}
+                <AddressAutocomplete
+                  value={pickupInput}
+                  onChange={setPickupInput}
+                  onSelect={(result) => {
+                    setPickupCoords({ lat: result.lat, lng: result.lng });
+                  }}
+                  placeholder="Enter pickup location"
+                  variant="pickup"
+                  showCurrentLocation
+                  onCurrentLocation={handleCurrentLocation}
+                  isLocating={isLocating}
+                />
 
-                {/* Destination Input */}
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 w-3 h-3 bg-accent rounded-sm" />
-                  <input
-                    type="text"
-                    placeholder="Where to?"
-                    value={destinationInput}
-                    onChange={(e) => setDestinationInput(e.target.value)}
-                    className="w-full pl-10 pr-4 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                </div>
+                {/* Destination Input with Autocomplete */}
+                <AddressAutocomplete
+                  value={destinationInput}
+                  onChange={setDestinationInput}
+                  onSelect={(result) => {
+                    setDestinationCoords({ lat: result.lat, lng: result.lng });
+                  }}
+                  placeholder="Where to?"
+                  variant="destination"
+                />
 
                 {/* Vehicle Selection */}
                 <div className="grid grid-cols-4 gap-2 pt-2">
@@ -135,7 +186,13 @@ export const HeroSection = () => {
                 </div>
 
                 {/* CTA Button */}
-                <Button variant="hero" size="xl" className="w-full group">
+                <Button 
+                  variant="hero" 
+                  size="xl" 
+                  className="w-full group"
+                  onClick={handleRequestRide}
+                  disabled={!canRequestRide}
+                >
                   Request GoRide
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
