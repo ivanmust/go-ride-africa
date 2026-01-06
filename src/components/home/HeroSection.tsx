@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,10 +11,35 @@ const vehicleTypes = [
   { id: "xl", name: "XL", icon: Truck, price: "RWF 1,800", time: "7 min" },
 ];
 
+// Route waypoints from pickup to destination for smooth animation
+const routeWaypoints = [
+  { lat: -1.9403, lng: 29.8739 },  // Start - Kigali center
+  { lat: -1.9420, lng: 29.8900 },
+  { lat: -1.9450, lng: 29.9100 },
+  { lat: -1.9480, lng: 29.9300 },
+  { lat: -1.9500, lng: 29.9500 },
+  { lat: -1.9520, lng: 29.9800 },
+  { lat: -1.9530, lng: 30.0100 },
+  { lat: -1.9535, lng: 30.0350 },
+  { lat: -1.9536, lng: 30.0606 },  // End - Kigali Airport
+];
+
 export const HeroSection = () => {
-  const [pickup, setPickup] = useState("");
-  const [destination, setDestination] = useState("");
+  const [pickupInput, setPickupInput] = useState("");
+  const [destinationInput, setDestinationInput] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState("economy");
+  const [driverPosition, setDriverPosition] = useState(0);
+
+  // Animate driver along the route
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDriverPosition((prev) => (prev + 1) % routeWaypoints.length);
+    }, 2000); // Move every 2 seconds
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const driverLocation = routeWaypoints[driverPosition];
 
   return (
     <section className="relative min-h-screen pt-16 overflow-hidden gradient-hero">
@@ -69,8 +94,8 @@ export const HeroSection = () => {
                   <input
                     type="text"
                     placeholder="Enter pickup location"
-                    value={pickup}
-                    onChange={(e) => setPickup(e.target.value)}
+                    value={pickupInput}
+                    onChange={(e) => setPickupInput(e.target.value)}
                     className="w-full pl-10 pr-12 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                   <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-background rounded-lg transition-colors">
@@ -84,8 +109,8 @@ export const HeroSection = () => {
                   <input
                     type="text"
                     placeholder="Where to?"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    value={destinationInput}
+                    onChange={(e) => setDestinationInput(e.target.value)}
                     className="w-full pl-10 pr-4 py-4 bg-secondary rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   />
                 </div>
@@ -142,8 +167,9 @@ export const HeroSection = () => {
               {/* Real Mapbox Map */}
               <div className="absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-border">
                 <MapboxMap
-                  pickup={{ lat: -1.9403, lng: 29.8739 }} // Kigali center
-                  destination={{ lat: -1.9536, lng: 30.0606 }} // Kigali Airport
+                  pickup={{ lat: -1.9403, lng: 29.8739 }}
+                  destination={{ lat: -1.9536, lng: 30.0606 }}
+                  driverLocation={driverLocation}
                   showRoute={true}
                   className="w-full h-full"
                 />
