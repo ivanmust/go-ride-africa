@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { MapPin, Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MapboxMap } from "@/components/maps/MapboxMap";
 
 const vehicleTypes = [
   { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min" },
@@ -135,68 +136,21 @@ export const HeroSection = () => {
             </div>
           </div>
 
-          {/* Right Content - Map Preview */}
+          {/* Right Content - Real Map */}
           <div className="relative hidden lg:block animate-fade-in" style={{ animationDelay: "0.3s" }}>
             <div className="relative aspect-square max-w-lg mx-auto">
-              {/* Map placeholder with gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-goride-green-light via-secondary to-goride-amber-light rounded-3xl shadow-2xl overflow-hidden">
-                {/* Simulated map grid */}
-                <div className="absolute inset-0 opacity-20">
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="absolute w-full h-px bg-foreground/20" style={{ top: `${i * 10}%` }} />
-                  ))}
-                  {[...Array(10)].map((_, i) => (
-                    <div key={i} className="absolute h-full w-px bg-foreground/20" style={{ left: `${i * 10}%` }} />
-                  ))}
-                </div>
-
-                {/* Road paths */}
-                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 400">
-                  <path
-                    d="M50 200 Q200 50 350 200"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="4"
-                    fill="none"
-                    strokeDasharray="8 4"
-                    className="opacity-60"
-                  />
-                  <path
-                    d="M100 350 Q200 200 300 100"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth="4"
-                    fill="none"
-                    strokeDasharray="8 4"
-                    className="opacity-40"
-                  />
-                </svg>
-
-                {/* Pickup marker */}
-                <div className="absolute top-1/3 left-1/4 transform -translate-x-1/2 -translate-y-1/2">
-                  <div className="relative">
-                    <div className="absolute -inset-4 bg-primary/20 rounded-full pulse-ring" />
-                    <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                      <MapPin className="w-4 h-4 text-primary-foreground" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Destination marker */}
-                <div className="absolute bottom-1/3 right-1/4 transform translate-x-1/2 translate-y-1/2">
-                  <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shadow-lg">
-                    <Navigation className="w-4 h-4 text-accent-foreground" />
-                  </div>
-                </div>
-
-                {/* Car icon moving */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-car-move">
-                  <div className="bg-foreground text-background w-10 h-10 rounded-xl flex items-center justify-center shadow-xl">
-                    <Car className="w-5 h-5" />
-                  </div>
-                </div>
+              {/* Real Mapbox Map */}
+              <div className="absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-border">
+                <MapboxMap
+                  pickup={{ lat: -1.9403, lng: 29.8739 }} // Kigali center
+                  destination={{ lat: -1.9536, lng: 30.0606 }} // Kigali Airport
+                  showRoute={true}
+                  className="w-full h-full"
+                />
               </div>
 
               {/* Floating cards */}
-              <div className="absolute -right-6 top-1/4 bg-card rounded-xl shadow-card p-4 border border-border animate-float">
+              <div className="absolute -right-6 top-1/4 bg-card rounded-xl shadow-card p-4 border border-border animate-float z-10">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-goride-green-light rounded-full flex items-center justify-center">
                     <Car className="w-5 h-5 text-primary" />
@@ -208,7 +162,7 @@ export const HeroSection = () => {
                 </div>
               </div>
 
-              <div className="absolute -left-6 bottom-1/4 bg-card rounded-xl shadow-card p-4 border border-border animate-float" style={{ animationDelay: "0.5s" }}>
+              <div className="absolute -left-6 bottom-1/4 bg-card rounded-xl shadow-card p-4 border border-border animate-float z-10" style={{ animationDelay: "0.5s" }}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-goride-amber-light rounded-full flex items-center justify-center">
                     <Navigation className="w-5 h-5 text-accent" />
