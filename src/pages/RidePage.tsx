@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,12 @@ import { Helmet } from "react-helmet-async";
 
 type RideState = "booking" | "searching" | "matched" | "arriving" | "riding" | "completed";
 
+interface LocationState {
+  pickup?: { lat: number; lng: number; address: string };
+  destination?: { lat: number; lng: number; address: string };
+  vehicleType?: string;
+}
+
 const vehicleTypes = [
   { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min", description: "Affordable everyday rides" },
   { id: "comfort", name: "Comfort", icon: Car, price: "RWF 1,200", time: "5 min", description: "Newer cars, top drivers" },
@@ -40,12 +47,19 @@ const recentLocations = [
 ];
 
 export const RidePage = () => {
+  const location = useLocation();
+  const locationState = location.state as LocationState | null;
+
   const [rideState, setRideState] = useState<RideState>("booking");
-  const [pickup, setPickup] = useState("");
-  const [destination, setDestination] = useState("");
-  const [selectedVehicle, setSelectedVehicle] = useState("economy");
-  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pickup, setPickup] = useState(locationState?.pickup?.address || "");
+  const [destination, setDestination] = useState(locationState?.destination?.address || "");
+  const [selectedVehicle, setSelectedVehicle] = useState(locationState?.vehicleType || "economy");
+  const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | null>(
+    locationState?.pickup ? { lat: locationState.pickup.lat, lng: locationState.pickup.lng } : null
+  );
+  const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(
+    locationState?.destination ? { lat: locationState.destination.lat, lng: locationState.destination.lng } : null
+  );
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocatingUser, setIsLocatingUser] = useState(false);
 
