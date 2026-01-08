@@ -8,6 +8,7 @@ import { MapboxMap } from "@/components/maps/MapboxMap";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
 import { ScheduleRideSelector } from "@/components/ride/ScheduleRideSelector";
+import { RideSharingToggle } from "@/components/ride/RideSharingToggle";
 import { useSavedLocations } from "@/hooks/useSavedLocations";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -69,6 +70,7 @@ export const RidePage = () => {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [rideSharing, setRideSharing] = useState(false);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -399,6 +401,12 @@ export const RidePage = () => {
                           Save this destination
                         </button>
                       )}
+
+                      {/* Ride Sharing Option */}
+                      <RideSharingToggle
+                        enabled={rideSharing}
+                        onToggle={setRideSharing}
+                      />
 
                       {/* Schedule Ride */}
                       <ScheduleRideSelector
