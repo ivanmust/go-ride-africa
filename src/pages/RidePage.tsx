@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { format } from "date-fns";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
 import { MapboxMap } from "@/components/maps/MapboxMap";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
+import { ScheduleRideSelector } from "@/components/ride/ScheduleRideSelector";
 import { useSavedLocations } from "@/hooks/useSavedLocations";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -66,6 +68,7 @@ export const RidePage = () => {
   const [isLocatingUser, setIsLocatingUser] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -397,6 +400,12 @@ export const RidePage = () => {
                         </button>
                       )}
 
+                      {/* Schedule Ride */}
+                      <ScheduleRideSelector
+                        scheduledDate={scheduledDate}
+                        onScheduleChange={setScheduledDate}
+                      />
+
                       {/* Payment Method */}
                       <div className="flex items-center justify-between p-4 bg-secondary rounded-xl">
                         <div className="flex items-center gap-3">
@@ -416,7 +425,9 @@ export const RidePage = () => {
                         onClick={handleRequestRide}
                         disabled={!pickupCoords}
                       >
-                        Request {vehicleTypes.find(v => v.id === selectedVehicle)?.name}
+                        {scheduledDate 
+                          ? `Schedule ${vehicleTypes.find(v => v.id === selectedVehicle)?.name}` 
+                          : `Request ${vehicleTypes.find(v => v.id === selectedVehicle)?.name}`}
                       </Button>
                     </>
                   )}
