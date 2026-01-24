@@ -9,7 +9,9 @@ import { GoogleAddressAutocomplete } from "@/components/maps/GoogleAddressAutoco
 import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
 import { ScheduleRideSelector } from "@/components/ride/ScheduleRideSelector";
 import { RideSharingToggle } from "@/components/ride/RideSharingToggle";
+import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
 import { useSavedLocations } from "@/hooks/useSavedLocations";
+import { useFareEstimation } from "@/hooks/useFareEstimation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   MapPin,
@@ -43,10 +45,10 @@ interface LocationState {
 }
 
 const vehicleTypes = [
-  { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min", description: "Affordable everyday rides" },
-  { id: "comfort", name: "Comfort", icon: Car, price: "RWF 1,200", time: "5 min", description: "Newer cars, top drivers" },
-  { id: "bike", name: "Bike", icon: Bike, price: "RWF 400", time: "2 min", description: "Quick trips, beat traffic" },
-  { id: "xl", name: "XL", icon: Truck, price: "RWF 1,800", time: "7 min", description: "Extra space for groups" },
+  { id: "economy", name: "Economy", icon: Car, time: "3 min", description: "Affordable everyday rides" },
+  { id: "comfort", name: "Comfort", icon: Car, time: "5 min", description: "Newer cars, top drivers" },
+  { id: "bike", name: "Bike", icon: Bike, time: "2 min", description: "Quick trips, beat traffic" },
+  { id: "xl", name: "XL", icon: Truck, time: "7 min", description: "Extra space for groups" },
 ];
 
 export const RidePage = () => {
@@ -71,6 +73,14 @@ export const RidePage = () => {
   const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [rideSharing, setRideSharing] = useState(false);
+
+  // Fare estimation
+  const { fareEstimate, isLoading: isFareLoading, formatFare } = useFareEstimation(
+    pickupCoords,
+    destinationCoords,
+    selectedVehicle,
+    rideSharing
+  );
 
   // Get user's current location
   const getCurrentLocation = () => {
@@ -358,6 +368,18 @@ export const RidePage = () => {
                   {/* Vehicle Selection */}
                   {destinationCoords && (
                     <>
+                      {/* Fare Estimate */}
+                      {fareEstimate && (
+                        <FareEstimateCard
+                          distance={fareEstimate.distance}
+                          duration={fareEstimate.duration}
+                          baseFare={fareEstimate.baseFare}
+                          discountedFare={fareEstimate.discountedFare}
+                          currency={fareEstimate.currency}
+                          isLoading={isFareLoading}
+                        />
+                      )}
+
                       <div>
                         <h3 className="text-sm font-medium text-muted-foreground mb-3">Choose a ride</h3>
                         <div className="space-y-2">
@@ -383,7 +405,6 @@ export const RidePage = () => {
                                 <div className="text-sm text-muted-foreground">{vehicle.description}</div>
                               </div>
                               <div className="text-right">
-                                <div className="font-semibold text-foreground">{vehicle.price}</div>
                                 <div className="text-sm text-muted-foreground">{vehicle.time}</div>
                               </div>
                             </button>

@@ -1,17 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
+import { Navigation, ArrowRight, Car, Bike, Truck, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoogleMap } from "@/components/maps/GoogleMap";
 import { GoogleAddressAutocomplete } from "@/components/maps/GoogleAddressAutocomplete";
 import { GOOGLE_MAPS_API_KEY } from "@/components/maps/GoogleMapsProvider";
+import { useFareEstimation } from "@/hooks/useFareEstimation";
 
 const vehicleTypes = [
-  { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min" },
-  { id: "comfort", name: "Comfort", icon: Car, price: "RWF 1,200", time: "5 min" },
-  { id: "bike", name: "Bike", icon: Bike, price: "RWF 400", time: "2 min" },
-  { id: "xl", name: "XL", icon: Truck, price: "RWF 1,800", time: "7 min" },
+  { id: "economy", name: "Economy", icon: Car },
+  { id: "comfort", name: "Comfort", icon: Car },
+  { id: "bike", name: "Bike", icon: Bike },
+  { id: "xl", name: "XL", icon: Truck },
 ];
 
 // Route waypoints from pickup to destination for smooth animation
@@ -44,8 +45,14 @@ export const HeroSection = () => {
     }, 2000);
     return () => clearInterval(interval);
   }, []);
-
   const driverLocation = routeWaypoints[driverPosition];
+
+  // Fare estimation
+  const { fareEstimate, isLoading: isFareLoading, formatFare } = useFareEstimation(
+    pickupCoords,
+    destinationCoords,
+    selectedVehicle
+  );
 
   const handleCurrentLocation = () => {
     setIsLocating(true);
@@ -166,6 +173,22 @@ export const HeroSection = () => {
                   placeholder="Where to?"
                   variant="destination"
                 />
+
+                {/* Fare Estimate Preview */}
+                {fareEstimate && pickupCoords && destinationCoords && (
+                  <div className="bg-secondary rounded-xl p-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                      <Navigation className="w-4 h-4" />
+                      <span>{fareEstimate.distance} km</span>
+                      <span>•</span>
+                      <Clock className="w-4 h-4" />
+                      <span>~{fareEstimate.duration} min</span>
+                    </div>
+                    <div className="font-semibold text-primary">
+                      {formatFare(fareEstimate.baseFare)}
+                    </div>
+                  </div>
+                )}
 
                 {/* Vehicle Selection */}
                 <div className="grid grid-cols-4 gap-2 pt-2">
