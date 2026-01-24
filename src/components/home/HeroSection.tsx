@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Navigation, ArrowRight, Car, Bike, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MapboxMap } from "@/components/maps/MapboxMap";
-import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { GoogleMap } from "@/components/maps/GoogleMap";
+import { GoogleAddressAutocomplete } from "@/components/maps/GoogleAddressAutocomplete";
+import { GOOGLE_MAPS_API_KEY } from "@/components/maps/GoogleMapsProvider";
 
 const vehicleTypes = [
   { id: "economy", name: "Economy", icon: Car, price: "RWF 800", time: "3 min" },
@@ -54,14 +55,14 @@ export const HeroSection = () => {
           const { latitude, longitude } = position.coords;
           setPickupCoords({ lat: latitude, lng: longitude });
           
-          // Reverse geocode to get address
+          // Reverse geocode to get address using Google Geocoding API
           try {
             const response = await fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${import.meta.env.VITE_MAPBOX_TOKEN || ""}`
+              `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`
             );
             const data = await response.json();
-            if (data.features?.[0]) {
-              setPickupInput(data.features[0].place_name);
+            if (data.results?.[0]) {
+              setPickupInput(data.results[0].formatted_address);
             } else {
               setPickupInput(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
             }
@@ -142,7 +143,7 @@ export const HeroSection = () => {
             <div className="bg-card rounded-2xl shadow-card p-6 border border-border">
               <div className="space-y-4">
                 {/* Pickup Input with Autocomplete */}
-                <AddressAutocomplete
+                <GoogleAddressAutocomplete
                   value={pickupInput}
                   onChange={setPickupInput}
                   onSelect={(result) => {
@@ -156,7 +157,7 @@ export const HeroSection = () => {
                 />
 
                 {/* Destination Input with Autocomplete */}
-                <AddressAutocomplete
+                <GoogleAddressAutocomplete
                   value={destinationInput}
                   onChange={setDestinationInput}
                   onSelect={(result) => {
@@ -221,9 +222,9 @@ export const HeroSection = () => {
           {/* Right Content - Real Map */}
           <div className="relative hidden lg:block animate-fade-in" style={{ animationDelay: "0.3s" }}>
             <div className="relative aspect-square max-w-lg mx-auto">
-              {/* Real Mapbox Map */}
+              {/* Real Google Map */}
               <div className="absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-border">
-                <MapboxMap
+                <GoogleMap
                   pickup={{ lat: -1.9403, lng: 29.8739 }}
                   destination={{ lat: -1.9536, lng: 30.0606 }}
                   driverLocation={driverLocation}

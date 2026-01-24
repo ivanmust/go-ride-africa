@@ -4,8 +4,8 @@ import { format } from "date-fns";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
-import { MapboxMap } from "@/components/maps/MapboxMap";
-import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
+import { GoogleMap } from "@/components/maps/GoogleMap";
+import { GoogleAddressAutocomplete } from "@/components/maps/GoogleAddressAutocomplete";
 import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
 import { ScheduleRideSelector } from "@/components/ride/ScheduleRideSelector";
 import { RideSharingToggle } from "@/components/ride/RideSharingToggle";
@@ -192,7 +192,7 @@ export const RidePage = () => {
           <div className="grid lg:grid-cols-[1fr,400px] min-h-[calc(100vh-64px)]">
             {/* Map Area */}
             <div className="relative order-2 lg:order-1">
-              <MapboxMap
+              <GoogleMap
                 pickup={pickupCoords}
                 destination={destinationCoords}
                 driverLocation={driverLocation}
@@ -268,7 +268,7 @@ export const RidePage = () => {
 
                   {/* Location Inputs */}
                   <div className="space-y-3">
-                    <AddressAutocomplete
+                    <GoogleAddressAutocomplete
                       value={pickup}
                       onChange={setPickup}
                       onSelect={(result) => {
@@ -282,7 +282,7 @@ export const RidePage = () => {
                       isLocating={isLocatingUser}
                     />
 
-                    <AddressAutocomplete
+                    <GoogleAddressAutocomplete
                       value={destination}
                       onChange={setDestination}
                       onSelect={(result) => {
