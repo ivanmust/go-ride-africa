@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { GoogleMapsProvider } from "@/components/maps/GoogleMapsProvider";
 import Index from "./pages/Index";
 import RidePage from "./pages/RidePage";
 import DrivePage from "./pages/DrivePage";
@@ -19,38 +20,40 @@ const queryClient = new QueryClient();
 const App = () => (
   <HelmetProvider>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/ride" element={<RidePage />} />
-              <Route path="/drive" element={<DrivePage />} />
-              <Route path="/auth" element={<AuthPage />} />
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <ProtectedRoute>
-                    <RideHistoryPage />
-                  </ProtectedRoute>
-                }
-              />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
+      <GoogleMapsProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/ride" element={<RidePage />} />
+                <Route path="/drive" element={<DrivePage />} />
+                <Route path="/auth" element={<AuthPage />} />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <ProtectedRoute>
+                      <RideHistoryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </GoogleMapsProvider>
     </QueryClientProvider>
   </HelmetProvider>
 );
