@@ -248,10 +248,10 @@ export const HeroSection = () => {
               {/* Real Google Map */}
               <div className="absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-border">
                 <GoogleMap
-                  pickup={{ lat: -1.9403, lng: 29.8739 }}
-                  destination={{ lat: -1.9536, lng: 30.0606 }}
-                  driverLocation={driverLocation}
-                  showRoute={true}
+                  pickup={pickupCoords || { lat: -1.9403, lng: 29.8739 }}
+                  destination={destinationCoords || { lat: -1.9536, lng: 30.0606 }}
+                  driverLocation={!pickupCoords && !destinationCoords ? driverLocation : undefined}
+                  showRoute={!!(pickupCoords && destinationCoords)}
                   className="w-full h-full"
                 />
               </div>
