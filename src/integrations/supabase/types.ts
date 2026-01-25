@@ -122,6 +122,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ride_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          ride_id: string
+          sender_id: string
+          sender_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          ride_id: string
+          sender_id: string
+          sender_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          ride_id?: string
+          sender_id?: string
+          sender_type?: string
+        }
+        Relationships: []
+      }
       saved_locations: {
         Row: {
           address: string
