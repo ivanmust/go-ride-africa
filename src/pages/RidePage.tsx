@@ -10,9 +10,11 @@ import { SaveLocationDialog } from "@/components/locations/SaveLocationDialog";
 import { ScheduleRideSelector } from "@/components/ride/ScheduleRideSelector";
 import { RideSharingToggle } from "@/components/ride/RideSharingToggle";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
+import { RideChatDrawer } from "@/components/ride/RideChatDrawer";
 import { useSavedLocations } from "@/hooks/useSavedLocations";
 import { useFareEstimation } from "@/hooks/useFareEstimation";
 import { useDriverTracking } from "@/hooks/useDriverTracking";
+import { useRideChat } from "@/hooks/useRideChat";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   MapPin,
@@ -73,6 +75,10 @@ export const RidePage = () => {
   const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [rideSharing, setRideSharing] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  
+  // For demo purposes, we'll use a mock ride ID when in active ride states
+  const [currentRideId] = useState(() => crypto.randomUUID());
 
   // Determine tracking phase based on ride state
   const trackingPhase = rideState === "matched" || rideState === "arriving" 
@@ -107,6 +113,27 @@ export const RidePage = () => {
       setRideState("completed");
     }
   }, [hasArrived, rideState]);
+
+  // Real-time chat
+  const isRideActive = rideState === "matched" || rideState === "arriving" || rideState === "riding";
+  const { 
+    messages, 
+    isLoading: isChatLoading, 
+    isSending, 
+    unreadCount,
+    sendMessage,
+    markAsRead 
+  } = useRideChat({
+    rideId: isRideActive ? currentRideId : null,
+    enabled: isRideActive,
+  });
+
+  // Mark messages as read when chat is opened
+  useEffect(() => {
+    if (isChatOpen && unreadCount > 0) {
+      markAsRead();
+    }
+  }, [isChatOpen, unreadCount, markAsRead]);
 
   // Fare estimation
   const { fareEstimate, isLoading: isFareLoading, formatFare } = useFareEstimation(
@@ -497,9 +524,18 @@ export const RidePage = () => {
                         <Phone className="w-4 h-4 mr-2" />
                         Call
                       </Button>
-                      <Button variant="goride-outline" className="flex-1">
+                      <Button 
+                        variant="goride-outline" 
+                        className="flex-1 relative"
+                        onClick={() => setIsChatOpen(true)}
+                      >
                         <MessageSquare className="w-4 h-4 mr-2" />
                         Message
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                            {unreadCount}
+                          </span>
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -576,6 +612,14 @@ export const RidePage = () => {
                       <div className="font-medium text-foreground">Emmanuel N.</div>
                       <div className="text-sm text-muted-foreground">Toyota Corolla</div>
                     </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsChatOpen(true)} className="relative">
+                      <MessageSquare className="w-4 h-4" />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Button>
                     <Button variant="ghost" size="icon">
                       <Phone className="w-4 h-4" />
                     </Button>
@@ -609,6 +653,17 @@ export const RidePage = () => {
           onSave={saveLocation}
         />
       )}
+
+      {/* Chat Drawer */}
+      <RideChatDrawer
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        messages={messages}
+        onSendMessage={sendMessage}
+        isSending={isSending}
+        isLoading={isChatLoading}
+        driverName="Emmanuel N."
+      />
     </>
   );
 };
