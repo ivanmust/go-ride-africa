@@ -12,6 +12,7 @@ import { RideSharingToggle } from "@/components/ride/RideSharingToggle";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
 import { useSavedLocations } from "@/hooks/useSavedLocations";
 import { useFareEstimation } from "@/hooks/useFareEstimation";
+import { useDriverTracking } from "@/hooks/useDriverTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   MapPin,
@@ -67,12 +68,45 @@ export const RidePage = () => {
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(
     locationState?.destination ? { lat: locationState.destination.lat, lng: locationState.destination.lng } : null
   );
-  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [isLocatingUser, setIsLocatingUser] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [locationToSave, setLocationToSave] = useState<{ address: string; coords: { lat: number; lng: number } } | null>(null);
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [rideSharing, setRideSharing] = useState(false);
+
+  // Determine tracking phase based on ride state
+  const trackingPhase = rideState === "matched" || rideState === "arriving" 
+    ? "to_pickup" 
+    : rideState === "riding" 
+      ? "to_destination" 
+      : "idle";
+
+  // Real-time driver tracking
+  const { 
+    driverLocation, 
+    eta: driverEta, 
+    distanceRemaining, 
+    isMoving, 
+    hasArrived,
+    progress: rideProgress,
+    resetTracking 
+  } = useDriverTracking({
+    pickupCoords,
+    destinationCoords,
+    isActive: rideState !== "booking" && rideState !== "searching" && rideState !== "completed",
+    phase: trackingPhase,
+  });
+
+  // Handle phase transitions when driver arrives
+  useEffect(() => {
+    if (hasArrived && rideState === "arriving") {
+      // Driver arrived at pickup, transition to riding
+      setRideState("riding");
+    } else if (hasArrived && rideState === "riding") {
+      // Arrived at destination, complete the ride
+      setRideState("completed");
+    }
+  }, [hasArrived, rideState]);
 
   // Fare estimation
   const { fareEstimate, isLoading: isFareLoading, formatFare } = useFareEstimation(
@@ -114,64 +148,13 @@ export const RidePage = () => {
     // Simulate driver matching after 2 seconds
     setTimeout(() => {
       setRideState("matched");
-      // Place driver somewhere near pickup
-      if (pickupCoords) {
-        setDriverLocation({
-          lat: pickupCoords.lat + 0.008,
-          lng: pickupCoords.lng + 0.005,
-        });
-      }
+      // Driver tracking will automatically start via the hook
     }, 2000);
   };
 
-  const simulateRideProgress = () => {
+  const startRideToPickup = () => {
     setRideState("arriving");
-    
-    // Animate driver towards pickup
-    const interval = setInterval(() => {
-      setDriverLocation((prev) => {
-        if (!prev || !pickupCoords) return prev;
-        const latDiff = pickupCoords.lat - prev.lat;
-        const lngDiff = pickupCoords.lng - prev.lng;
-        
-        if (Math.abs(latDiff) < 0.0005 && Math.abs(lngDiff) < 0.0005) {
-          clearInterval(interval);
-          // Driver arrived, start riding
-          setTimeout(() => {
-            setRideState("riding");
-            simulateRiding();
-          }, 1000);
-          return pickupCoords;
-        }
-        
-        return {
-          lat: prev.lat + latDiff * 0.2,
-          lng: prev.lng + lngDiff * 0.2,
-        };
-      });
-    }, 500);
-  };
-
-  const simulateRiding = () => {
-    // Animate driver from pickup to destination
-    const interval = setInterval(() => {
-      setDriverLocation((prev) => {
-        if (!prev || !destinationCoords) return prev;
-        const latDiff = destinationCoords.lat - prev.lat;
-        const lngDiff = destinationCoords.lng - prev.lng;
-        
-        if (Math.abs(latDiff) < 0.001 && Math.abs(lngDiff) < 0.001) {
-          clearInterval(interval);
-          setRideState("completed");
-          return destinationCoords;
-        }
-        
-        return {
-          lat: prev.lat + latDiff * 0.1,
-          lng: prev.lng + lngDiff * 0.1,
-        };
-      });
-    }, 800);
+    // The useDriverTracking hook handles the movement automatically
   };
 
   const handleSavedLocationSelect = (loc: { name: string; address: string; latitude: number | null; longitude: number | null }) => {
@@ -258,7 +241,7 @@ export const RidePage = () => {
                       setRideState("booking");
                       setPickupCoords(null);
                       setDestinationCoords(null);
-                      setDriverLocation(null);
+                      resetTracking();
                       setPickup("");
                       setDestination("");
                     }}>
@@ -472,12 +455,13 @@ export const RidePage = () => {
                         {rideState === "matched" ? "Driver on the way" : "Driver arriving"}
                       </h2>
                       <p className="text-muted-foreground">
-                        {rideState === "matched" ? "3 min away" : "Almost there"}
+                        {driverEta > 0 ? `${driverEta} min away` : "Almost there"} 
+                        {distanceRemaining > 0 && ` • ${distanceRemaining} km`}
                       </p>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => {
                       setRideState("booking");
-                      setDriverLocation(null);
+                      resetTracking();
                     }}>
                       <X className="w-5 h-5" />
                     </Button>
@@ -550,8 +534,8 @@ export const RidePage = () => {
                     </div>
                   </div>
 
-                  <Button variant="goride" className="w-full" onClick={simulateRideProgress}>
-                    Simulate Ride Progress
+                  <Button variant="goride" className="w-full" onClick={startRideToPickup}>
+                    Start Tracking Driver
                   </Button>
                 </div>
               )}
@@ -561,17 +545,26 @@ export const RidePage = () => {
                 <div className="space-y-6 animate-fade-in">
                   <div>
                     <h2 className="text-xl font-bold text-foreground">On your way!</h2>
-                    <p className="text-muted-foreground">Arriving in 8 minutes</p>
+                    <p className="text-muted-foreground">
+                      {driverEta > 0 ? `Arriving in ${driverEta} minutes` : "Arriving now"}
+                    </p>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="bg-secondary rounded-full h-2 overflow-hidden">
-                    <div className="bg-primary h-full w-1/3 rounded-full animate-pulse" />
+                    <div 
+                      className="bg-primary h-full rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(rideProgress, 100)}%` }}
+                    />
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">4.2 km remaining</span>
-                    <span className="font-medium text-foreground">RWF 1,200</span>
+                    <span className="text-muted-foreground">
+                      {distanceRemaining > 0 ? `${distanceRemaining} km remaining` : "Arrived"}
+                    </span>
+                    <span className="font-medium text-foreground">
+                      {fareEstimate ? formatFare(fareEstimate.discountedFare || fareEstimate.baseFare) : "RWF 1,200"}
+                    </span>
                   </div>
 
                   {/* Driver Mini Card */}
