@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { GoRideLogo } from '@/components/icons/GoRideLogo';
 import { toast } from 'sonner';
-import { Loader2, Phone, Mail, ArrowLeft } from 'lucide-react';
+import { Loader2, Phone, Mail, ArrowLeft, Car, User } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -17,13 +17,19 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 const phoneSchema = z.string().regex(/^\+?[1-9]\d{8,14}$/, 'Please enter a valid phone number');
 
 type AuthMode = 'select' | 'email-login' | 'email-signup' | 'phone' | 'otp';
+type UserType = 'passenger' | 'driver';
 
 const AuthPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user, signInWithEmail, signUpWithEmail, signInWithPhone, verifyOtp } = useAuth();
   
+  // Check if user came from driver signup flow
+  const initialUserType = searchParams.get('type') === 'driver' ? 'driver' : 'passenger';
+  
   const [mode, setMode] = useState<AuthMode>('select');
+  const [userType, setUserType] = useState<UserType>(initialUserType);
   const [loading, setLoading] = useState(false);
   
   // Form states
@@ -83,7 +89,7 @@ const AuthPage = () => {
     }
 
     setLoading(true);
-    const { error } = await signUpWithEmail(email, password, fullName);
+    const { error } = await signUpWithEmail(email, password, fullName, userType);
     setLoading(false);
 
     if (error) {
@@ -93,7 +99,10 @@ const AuthPage = () => {
         toast.error(error.message);
       }
     } else {
-      toast.success('Account created successfully!');
+      toast.success(userType === 'driver' ? 'Driver account created!' : 'Account created successfully!');
+      if (userType === 'driver') {
+        navigate('/drive');
+      }
     }
   };
 
@@ -137,6 +146,44 @@ const AuthPage = () => {
       toast.success('Welcome!');
     }
   };
+
+  const renderUserTypeSelector = () => (
+    <div className="space-y-4 mb-6">
+      <p className="text-sm font-medium text-muted-foreground text-center">I want to:</p>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => setUserType('passenger')}
+          className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+            userType === 'passenger'
+              ? 'border-primary bg-goride-green-light'
+              : 'border-border hover:border-primary/50'
+          }`}
+        >
+          <User className={`h-6 w-6 ${userType === 'passenger' ? 'text-primary' : 'text-muted-foreground'}`} />
+          <span className={`font-medium ${userType === 'passenger' ? 'text-primary' : 'text-foreground'}`}>
+            Ride
+          </span>
+          <span className="text-xs text-muted-foreground">Book rides</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setUserType('driver')}
+          className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
+            userType === 'driver'
+              ? 'border-accent bg-goride-amber-light'
+              : 'border-border hover:border-accent/50'
+          }`}
+        >
+          <Car className={`h-6 w-6 ${userType === 'driver' ? 'text-accent' : 'text-muted-foreground'}`} />
+          <span className={`font-medium ${userType === 'driver' ? 'text-accent' : 'text-foreground'}`}>
+            Drive
+          </span>
+          <span className="text-xs text-muted-foreground">Earn money</span>
+        </button>
+      </div>
+    </div>
+  );
 
   const renderContent = () => {
     switch (mode) {
@@ -202,6 +249,7 @@ const AuthPage = () => {
             </TabsContent>
             
             <TabsContent value="signup" className="mt-6">
+              {renderUserTypeSelector()}
               <form onSubmit={handleEmailSignup} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
@@ -235,8 +283,15 @@ const AuthPage = () => {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Account'}
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={loading}
+                  variant={userType === 'driver' ? 'goride-accent' : 'default'}
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                    userType === 'driver' ? 'Create Driver Account' : 'Create Account'
+                  )}
                 </Button>
               </form>
             </TabsContent>
@@ -317,16 +372,16 @@ const AuthPage = () => {
             <GoRideLogo className="h-12 w-auto" />
           </div>
           <CardTitle className="text-2xl">
-            {mode === 'select' && 'Welcome to GoRide'}
+            {mode === 'select' && (initialUserType === 'driver' ? 'Join as a Driver' : 'Welcome to GoRide')}
             {mode === 'email-login' && 'Sign in to your account'}
-            {mode === 'email-signup' && 'Create your account'}
+            {mode === 'email-signup' && (userType === 'driver' ? 'Create Driver Account' : 'Create your account')}
             {mode === 'phone' && 'Enter your phone number'}
             {mode === 'otp' && 'Verify your phone'}
           </CardTitle>
           <CardDescription>
-            {mode === 'select' && 'Choose how you want to continue'}
+            {mode === 'select' && (initialUserType === 'driver' ? 'Start earning on your schedule' : 'Choose how you want to continue')}
             {mode === 'email-login' && 'Enter your email and password'}
-            {mode === 'email-signup' && 'Fill in your details to get started'}
+            {mode === 'email-signup' && (userType === 'driver' ? 'Fill in your details to start driving' : 'Fill in your details to get started')}
             {mode === 'phone' && 'We\'ll send you a verification code'}
             {mode === 'otp' && 'Enter the code we sent you'}
           </CardDescription>

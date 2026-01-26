@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type AppRole = Database['public']['Enums']['app_role'];
 
 interface Profile {
   id: string;
@@ -14,9 +17,13 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  userRole: AppRole | null;
   loading: boolean;
+  isDriver: boolean;
+  isPassenger: boolean;
+  isAdmin: boolean;
   signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUpWithEmail: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
+  signUpWithEmail: (email: string, password: string, fullName?: string, role?: AppRole) => Promise<{ error: Error | null }>;
   signInWithPhone: (phone: string) => Promise<{ error: Error | null }>;
   verifyOtp: (phone: string, token: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -38,6 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
@@ -52,9 +60,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const fetchUserRole = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!error && data) {
+      setUserRole(data.role);
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
+      await fetchUserRole(user.id);
     }
   };
 
@@ -69,9 +90,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
+            fetchUserRole(session.user.id);
           }, 0);
         } else {
           setProfile(null);
+          setUserRole(null);
         }
         
         setLoading(false);
@@ -85,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (session?.user) {
         fetchProfile(session.user.id);
+        fetchUserRole(session.user.id);
       }
       
       setLoading(false);
@@ -101,19 +125,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
-  const signUpWithEmail = async (email: string, password: string, fullName?: string) => {
+  const signUpWithEmail = async (email: string, password: string, fullName?: string, role?: AppRole) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: redirectUrl,
         data: {
           full_name: fullName || '',
+          requested_role: role || 'passenger',
         },
       },
     });
+    
+    // If a non-passenger role was requested, update the user_roles table after signup
+    if (!error && data.user && role && role !== 'passenger') {
+      await supabase
+        .from('user_roles')
+        .update({ role })
+        .eq('user_id', data.user.id);
+    }
+    
     return { error: error as Error | null };
   };
 
@@ -138,7 +172,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setSession(null);
     setProfile(null);
+    setUserRole(null);
   };
+
+  // Computed role helpers
+  const isDriver = userRole === 'driver';
+  const isPassenger = userRole === 'passenger';
+  const isAdmin = userRole === 'admin';
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('Not authenticated') };
@@ -161,7 +201,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         session,
         profile,
+        userRole,
         loading,
+        isDriver,
+        isPassenger,
+        isAdmin,
         signInWithEmail,
         signUpWithEmail,
         signInWithPhone,
