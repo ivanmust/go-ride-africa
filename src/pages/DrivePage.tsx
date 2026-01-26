@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+import { DriverDashboard } from "@/components/driver/DriverDashboard";
 import {
   DollarSign,
   Clock,
@@ -12,9 +15,7 @@ import {
   Car,
   FileText,
   User,
-  Phone,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Helmet } from "react-helmet-async";
 
 const requirements = [
@@ -40,6 +41,8 @@ const earnings = [
 ];
 
 export const DrivePage = () => {
+  const navigate = useNavigate();
+  const { user, isDriver, loading } = useAuth();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -51,10 +54,29 @@ export const DrivePage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission
-    console.log("Form submitted:", formData);
+    // Navigate to auth page with driver type
+    navigate("/auth?type=driver");
   };
 
+  // Show driver dashboard if logged in as driver
+  if (!loading && user && isDriver) {
+    return (
+      <>
+        <Helmet>
+          <title>Driver Dashboard | GoRide</title>
+          <meta name="description" content="Manage your rides, track earnings, and go online to start accepting ride requests." />
+        </Helmet>
+        <div className="min-h-screen bg-background">
+          <Header />
+          <main className="pt-16">
+            <DriverDashboard />
+          </main>
+        </div>
+      </>
+    );
+  }
+
+  // Show signup/landing page for non-drivers
   return (
     <>
       <Helmet>
@@ -330,7 +352,11 @@ export const DrivePage = () => {
               <p className="text-primary-foreground/80 text-lg mb-8 max-w-2xl mx-auto">
                 Join thousands of driver-partners and start earning on your own terms today.
               </p>
-              <Button size="xl" className="bg-foreground text-background hover:bg-foreground/90">
+              <Button 
+                size="xl" 
+                className="bg-foreground text-background hover:bg-foreground/90"
+                onClick={() => navigate("/auth?type=driver")}
+              >
                 Apply Now
                 <ChevronRight className="w-5 h-5" />
               </Button>

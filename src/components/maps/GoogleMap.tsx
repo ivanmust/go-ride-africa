@@ -133,7 +133,7 @@ export const GoogleMap = ({
   }, [pickup, destination, showRoute]);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`${className || 'relative'}`} style={{ minHeight: className?.includes('absolute') ? undefined : '400px' }}>
       <GoogleMapComponent
         mapContainerStyle={mapContainerStyle}
         center={defaultCenter}
