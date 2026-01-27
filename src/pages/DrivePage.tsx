@@ -5,6 +5,7 @@ import { Footer } from "@/components/home/Footer";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { DriverDashboard } from "@/components/driver/DriverDashboard";
+import { DriverDocumentsSection } from "@/components/driver/DriverDocumentsSection";
 import {
   DollarSign,
   Clock,
@@ -70,7 +71,13 @@ export const DrivePage = () => {
           <Header />
           <main className="pt-16">
             <DriverDashboard />
+            
+            {/* Documents Section */}
+            <div className="container mx-auto px-4 py-8">
+              <DriverDocumentsSection />
+            </div>
           </main>
+          <Footer />
         </div>
       </>
     );
