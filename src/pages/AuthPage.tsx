@@ -23,7 +23,7 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user, signInWithEmail, signUpWithEmail, signInWithPhone, verifyOtp } = useAuth();
+  const { user, userRole, signInWithEmail, signUpWithEmail, signInWithPhone, verifyOtp } = useAuth();
   
   // Check if user came from driver signup flow
   const initialUserType = searchParams.get('type') === 'driver' ? 'driver' : 'passenger';
@@ -42,10 +42,15 @@ const AuthPage = () => {
   const from = (location.state as { from?: Location })?.from?.pathname || '/';
 
   useEffect(() => {
-    if (user) {
-      navigate(from, { replace: true });
+    if (user && userRole) {
+      // Redirect based on user role
+      if (userRole === 'driver') {
+        navigate('/drive', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     }
-  }, [user, navigate, from]);
+  }, [user, userRole, navigate, from]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
