@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpWithEmail = async (email: string, password: string, fullName?: string, role?: AppRole) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -139,14 +139,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       },
     });
-    
-    // If a non-passenger role was requested, update the user_roles table after signup
-    if (!error && data.user && role && role !== 'passenger') {
-      await supabase
-        .from('user_roles')
-        .update({ role })
-        .eq('user_id', data.user.id);
-    }
     
     return { error: error as Error | null };
   };
