@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { GoRideLogo } from "@/components/icons/GoRideLogo";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, User, History, LogOut } from "lucide-react";
+import { Menu, X, ChevronDown, User, History, LogOut, Car, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "sonner";
 
 const navItems = [
   { label: "Ride", href: "/ride" },
@@ -25,7 +26,8 @@ export const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, userRole, isDriver, signOut, switchRole } = useAuth();
+  const [isSwitching, setIsSwitching] = useState(false);
 
   const getInitials = (name: string | null) => {
     if (!name) return "U";
@@ -35,6 +37,21 @@ export const Header = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleSwitchRole = async () => {
+    if (isSwitching) return;
+    setIsSwitching(true);
+    const newRole = isDriver ? 'passenger' : 'driver';
+    const { error } = await switchRole(newRole);
+    setIsSwitching(false);
+    
+    if (error) {
+      toast.error("Failed to switch role");
+    } else {
+      toast.success(`Switched to ${newRole} mode`);
+      navigate(newRole === 'driver' ? '/drive' : '/ride');
+    }
   };
 
   return (
@@ -81,7 +98,24 @@ export const Header = () => {
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  Current mode: {isDriver ? 'Driver' : 'Passenger'}
+                </div>
+                <DropdownMenuItem onClick={handleSwitchRole} disabled={isSwitching}>
+                  {isDriver ? (
+                    <>
+                      <Users className="mr-2 h-4 w-4" />
+                      Switch to Passenger
+                    </>
+                  ) : (
+                    <>
+                      <Car className="mr-2 h-4 w-4" />
+                      Switch to Driver
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <User className="mr-2 h-4 w-4" />
                   Profile
@@ -140,6 +174,24 @@ export const Header = () => {
             <div className="border-t border-border my-2" />
             {user ? (
               <>
+                <div className="px-4 py-2 text-sm text-muted-foreground">
+                  Current mode: {isDriver ? 'Driver' : 'Passenger'}
+                </div>
+                <Button 
+                  variant="goride-outline" 
+                  className="w-full" 
+                  onClick={() => {
+                    handleSwitchRole();
+                    setMobileMenuOpen(false);
+                  }}
+                  disabled={isSwitching}
+                >
+                  {isDriver ? (
+                    <><Users className="mr-2 h-4 w-4" /> Switch to Passenger</>
+                  ) : (
+                    <><Car className="mr-2 h-4 w-4" /> Switch to Driver</>
+                  )}
+                </Button>
                 <Link to="/profile" onClick={() => setMobileMenuOpen(false)}>
                   <Button variant="goride-outline" className="w-full">Profile</Button>
                 </Link>
