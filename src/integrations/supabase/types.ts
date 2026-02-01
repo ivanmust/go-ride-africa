@@ -56,6 +56,93 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_earnings: {
+        Row: {
+          commission_amount: number
+          commission_rate: number
+          created_at: string
+          date: string
+          driver_id: string
+          id: string
+          net_earnings: number
+          online_hours: number | null
+          total_fares: number
+          trips_count: number
+          updated_at: string
+        }
+        Insert: {
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          date?: string
+          driver_id: string
+          id?: string
+          net_earnings?: number
+          online_hours?: number | null
+          total_fares?: number
+          trips_count?: number
+          updated_at?: string
+        }
+        Update: {
+          commission_amount?: number
+          commission_rate?: number
+          created_at?: string
+          date?: string
+          driver_id?: string
+          id?: string
+          net_earnings?: number
+          online_hours?: number | null
+          total_fares?: number
+          trips_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      driver_payouts: {
+        Row: {
+          amount: number
+          created_at: string
+          driver_id: string
+          id: string
+          mobile_money_number: string | null
+          mobile_money_provider: string | null
+          notes: string | null
+          payout_method: string
+          processed_at: string | null
+          requested_at: string
+          status: string
+          transaction_reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          driver_id: string
+          id?: string
+          mobile_money_number?: string | null
+          mobile_money_provider?: string | null
+          notes?: string | null
+          payout_method?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          transaction_reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          driver_id?: string
+          id?: string
+          mobile_money_number?: string | null
+          mobile_money_provider?: string | null
+          notes?: string | null
+          payout_method?: string
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          transaction_reference?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

@@ -10,6 +10,7 @@ import { GoogleMapsProvider } from "@/components/maps/GoogleMapsProvider";
 import Index from "./pages/Index";
 import RidePage from "./pages/RidePage";
 import DrivePage from "./pages/DrivePage";
+import DriverEarningsPage from "./pages/DriverEarningsPage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import RideHistoryPage from "./pages/RideHistoryPage";
@@ -30,6 +31,14 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/ride" element={<RidePage />} />
                 <Route path="/drive" element={<DrivePage />} />
+                <Route
+                  path="/earnings"
+                  element={
+                    <ProtectedRoute>
+                      <DriverEarningsPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/auth" element={<AuthPage />} />
                 <Route
                   path="/profile"
