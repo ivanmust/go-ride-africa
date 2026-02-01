@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   XCircle,
   Timer,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoogleMap } from "@/components/maps/GoogleMap";
@@ -194,24 +196,30 @@ export const DriverDashboard = () => {
         </div>
 
         {/* Earnings Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-goride-green-light rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-5 h-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Today's Earnings</span>
+        <Link to="/earnings" className="block mb-6 group">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-goride-green-light rounded-xl p-4 transition-all group-hover:ring-2 group-hover:ring-primary/30">
+              <div className="flex items-center gap-2 mb-2">
+                <DollarSign className="w-5 h-5 text-primary" />
+                <span className="text-sm text-muted-foreground">Today's Earnings</span>
+              </div>
+              <div className="text-2xl font-bold text-foreground">
+                RWF {earnings.today.toLocaleString()}
+              </div>
             </div>
-            <div className="text-2xl font-bold text-foreground">
-              RWF {earnings.today.toLocaleString()}
+            <div className="bg-goride-amber-light rounded-xl p-4 transition-all group-hover:ring-2 group-hover:ring-accent/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Car className="w-5 h-5 text-accent" />
+                <span className="text-sm text-muted-foreground">Trips Today</span>
+              </div>
+              <div className="text-2xl font-bold text-foreground">{earnings.trips}</div>
             </div>
           </div>
-          <div className="bg-goride-amber-light rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Car className="w-5 h-5 text-accent" />
-              <span className="text-sm text-muted-foreground">Trips Today</span>
-            </div>
-            <div className="text-2xl font-bold text-foreground">{earnings.trips}</div>
+          <div className="flex items-center justify-center gap-1 mt-2 text-sm text-muted-foreground group-hover:text-primary transition-colors">
+            <span>View earnings breakdown</span>
+            <ChevronRight className="w-4 h-4" />
           </div>
-        </div>
+        </Link>
 
         {/* Active Trip Panel */}
         {(driverState === "navigating_pickup" || driverState === "at_pickup" || driverState === "in_trip") && currentRide && (
