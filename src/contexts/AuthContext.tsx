@@ -29,6 +29,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
+  switchRole: (newRole: AppRole) => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -187,6 +188,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error as Error | null };
   };
 
+  const switchRole = async (newRole: AppRole) => {
+    if (!user) return { error: new Error('Not authenticated') };
+    if (newRole === 'admin') return { error: new Error('Cannot switch to admin role') };
+
+    const { error } = await supabase.rpc('switch_user_role', { _new_role: newRole });
+
+    if (!error) {
+      setUserRole(newRole);
+    }
+
+    return { error: error as Error | null };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -205,6 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signOut,
         updateProfile,
         refreshProfile,
+        switchRole,
       }}
     >
       {children}
