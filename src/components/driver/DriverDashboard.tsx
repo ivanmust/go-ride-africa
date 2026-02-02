@@ -17,6 +17,7 @@ import {
   XCircle,
   Timer,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GoogleMap } from "@/components/maps/GoogleMap";
@@ -324,32 +325,41 @@ export const DriverDashboard = () => {
 
         {/* Quick Stats */}
         {isOnline && (
-          <div className="mt-6 space-y-3">
-            <h3 className="font-semibold text-foreground">Today's Stats</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Online Time</span>
+          <Link to="/performance" className="block mt-6 group">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">Today's Stats</h3>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Analytics</span>
+                  <ChevronRight className="w-4 h-4" />
                 </div>
-                <span className="font-medium">4h 32m</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-accent" />
-                  <span className="text-sm">Rating</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-secondary rounded-lg group-hover:ring-1 group-hover:ring-primary/20 transition-all">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">Online Time</span>
+                  </div>
+                  <span className="font-medium">4h 32m</span>
                 </div>
-                <span className="font-medium">4.92</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-secondary rounded-lg">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  <span className="text-sm">Acceptance Rate</span>
+                <div className="flex items-center justify-between p-3 bg-secondary rounded-lg group-hover:ring-1 group-hover:ring-primary/20 transition-all">
+                  <div className="flex items-center gap-2">
+                    <Star className="w-4 h-4 text-accent" />
+                    <span className="text-sm">Rating</span>
+                  </div>
+                  <span className="font-medium">4.92</span>
                 </div>
-                <span className="font-medium">94%</span>
+                <div className="flex items-center justify-between p-3 bg-secondary rounded-lg group-hover:ring-1 group-hover:ring-primary/20 transition-all">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    <span className="text-sm">Acceptance Rate</span>
+                  </div>
+                  <span className="font-medium">94%</span>
+                </div>
               </div>
             </div>
-          </div>
+          </Link>
         )}
       </div>
     </div>

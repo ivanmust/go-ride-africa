@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import RidePage from "./pages/RidePage";
 import DrivePage from "./pages/DrivePage";
 import DriverEarningsPage from "./pages/DriverEarningsPage";
+import DriverPerformancePage from "./pages/DriverPerformancePage";
 import AuthPage from "./pages/AuthPage";
 import ProfilePage from "./pages/ProfilePage";
 import RideHistoryPage from "./pages/RideHistoryPage";
@@ -36,6 +37,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <DriverEarningsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/performance"
+                  element={
+                    <ProtectedRoute>
+                      <DriverPerformancePage />
                     </ProtectedRoute>
                   }
                 />
