@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyDYv8vuhD6Yvs_jKpeSFVaxj8XsWFAaaLY";
 
-const libraries: ("places" | "geometry" | "drawing")[] = ["places", "geometry"];
+const libraries: ("places" | "geometry" | "drawing" | "marker")[] = ["places", "geometry", "marker"];
 
 interface GoogleMapsProviderProps {
   children: ReactNode;
@@ -11,9 +11,10 @@ interface GoogleMapsProviderProps {
 
 export const GoogleMapsProvider = ({ children }: GoogleMapsProviderProps) => {
   return (
-    <LoadScript 
-      googleMapsApiKey={GOOGLE_MAPS_API_KEY} 
+    <LoadScript
+      googleMapsApiKey={GOOGLE_MAPS_API_KEY}
       libraries={libraries}
+      loadingStrategy="async"
       loadingElement={
         <div className="flex items-center justify-center h-full bg-secondary">
           <div className="text-center">
@@ -28,4 +29,5 @@ export const GoogleMapsProvider = ({ children }: GoogleMapsProviderProps) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- shared constant for maps
 export { GOOGLE_MAPS_API_KEY };

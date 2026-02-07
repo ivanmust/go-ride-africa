@@ -1,0 +1,16 @@
+Copy these into Flutterwave Dashboard → Settings → Webhooks
+============================================================
+
+1. WEBHOOK URL (paste in "Webhook URL" field):
+   http://localhost:3000/api/payments/webhook
+
+   NOTE: Flutterwave cannot reach localhost. For local testing:
+   - Run: npx ngrok http 3000
+   - Use the https URL it gives, e.g. https://abc123.ngrok.io/api/payments/webhook
+   - When you deploy your backend, use: https://YOUR-API-DOMAIN/api/payments/webhook
+
+2. SECRET HASH (paste in "Secret hash" field):
+   Copy the value of FLW_WEBHOOK_SECRET from backend/.env and paste it here.
+   The same value must be in both the dashboard and backend/.env.
+
+3. Save in the dashboard. Restart your backend if it was already running.

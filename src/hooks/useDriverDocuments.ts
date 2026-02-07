@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDriverAuth } from "@/apps/driver/auth/DriverAuthContext";
+import { api } from "@/shared";
 import { toast } from 'sonner';
 
 export type DocumentType = 'drivers_license' | 'national_id' | 'vehicle_registration' | 'insurance' | 'inspection_certificate';
@@ -29,7 +29,7 @@ export const DOCUMENT_TYPES: { type: DocumentType; label: string; description: s
 ];
 
 export const useDriverDocuments = () => {
-  const { user } = useAuth();
+  const { user } = useDriverAuth();
   const [documents, setDocuments] = useState<DriverDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<DocumentType | null>(null);
@@ -40,18 +40,10 @@ export const useDriverDocuments = () => {
       setLoading(false);
       return;
     }
-
     try {
-      const { data, error } = await supabase
-        .from('driver_documents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      // Type assertion since we know the structure matches
-      setDocuments((data || []) as unknown as DriverDocument[]);
+      const { data, error } = await api.get<DriverDocument[]>('/driver-documents');
+      if (error) throw new Error(error.message);
+      setDocuments((data || []) as DriverDocument[]);
     } catch (error) {
       console.error('Error fetching documents:', error);
       toast.error('Failed to load documents');
@@ -87,61 +79,11 @@ export const useDriverDocuments = () => {
     setUploading(documentType);
 
     try {
-      // Generate unique file path
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${documentType}_${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
-
-      // Upload file to storage
-      const { error: uploadError } = await supabase.storage
-        .from('driver-documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Check if document record already exists
-      const existingDoc = documents.find(d => d.document_type === documentType);
-
-      if (existingDoc) {
-        // Delete old file if exists
-        if (existingDoc.file_path) {
-          await supabase.storage
-            .from('driver-documents')
-            .remove([existingDoc.file_path]);
-        }
-
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('driver_documents')
-          .update({
-            file_path: filePath,
-            file_name: file.name,
-            status: 'pending',
-            rejection_reason: null,
-            uploaded_at: new Date().toISOString(),
-            reviewed_at: null,
-          })
-          .eq('id', existingDoc.id);
-
-        if (updateError) throw updateError;
-      } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from('driver_documents')
-          .insert({
-            user_id: user.id,
-            document_type: documentType,
-            file_path: filePath,
-            file_name: file.name,
-            status: 'pending',
-          });
-
-        if (insertError) throw insertError;
-      }
-
+      const formData = new FormData();
+      formData.append('document_type', documentType);
+      formData.append('file', file);
+      const { error: uploadError } = await api.uploadForm<DriverDocument>('/driver-documents', formData);
+      if (uploadError) throw new Error(uploadError.message);
       toast.success('Document uploaded successfully');
       await fetchDocuments();
       return { error: null };
@@ -158,24 +100,8 @@ export const useDriverDocuments = () => {
     if (!user) return { error: new Error('Not authenticated') };
 
     try {
-      const doc = documents.find(d => d.id === documentId);
-      if (!doc) throw new Error('Document not found');
-
-      // Delete file from storage
-      const { error: storageError } = await supabase.storage
-        .from('driver-documents')
-        .remove([doc.file_path]);
-
-      if (storageError) console.warn('Error deleting file:', storageError);
-
-      // Delete record from database
-      const { error: deleteError } = await supabase
-        .from('driver_documents')
-        .delete()
-        .eq('id', documentId);
-
-      if (deleteError) throw deleteError;
-
+      const { error } = await api.delete(`/driver-documents/${documentId}`);
+      if (error) throw new Error(error.message);
       toast.success('Document deleted');
       await fetchDocuments();
       return { error: null };
@@ -187,16 +113,8 @@ export const useDriverDocuments = () => {
   };
 
   const getDocumentUrl = async (filePath: string): Promise<string | null> => {
-    const { data, error } = await supabase.storage
-      .from('driver-documents')
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-    if (error) {
-      console.error('Error getting document URL:', error);
-      return null;
-    }
-
-    return data.signedUrl;
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    return filePath;
   };
 
   const getDocumentByType = (type: DocumentType): DriverDocument | undefined => {

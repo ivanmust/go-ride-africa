@@ -1,0 +1,281 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  RIDER
+  DRIVER
+  ADMIN
+}
+
+enum VehicleType {
+  CAR
+  MOTO
+}
+
+enum PickupMode {
+  STATIONS
+  FLEXIBLE
+}
+
+enum RouteOfferStatus {
+  DRAFT
+  PUBLISHED
+  FULL
+  CANCELLED
+  COMPLETED
+}
+
+enum ExecutionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  REQUESTED
+  OFFERED
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  BOARDED
+  DROPPED
+  COMPLETED
+}
+
+enum EntityType {
+  ROUTE_OFFER
+  BOOKING
+  EXECUTION
+}
+
+enum PaymentMethod {
+  CASH
+  WALLET
+  CARD
+}
+
+enum PaymentStatus {
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum WalletTxnType {
+  DEBIT
+  CREDIT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  role      UserRole
+  name      String?
+  createdAt DateTime @default(now())
+
+  driverProfile DriverProfile?
+  riderProfile  RiderProfile?
+  wallet        Wallet?
+  chatMessages  ChatMessage[] @relation("UserChatMessages")
+}
+
+model DriverProfile {
+  userId      String   @id
+  rating      Float?   @default(5.0)
+  vehicleType VehicleType
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  vehicles Vehicle[]
+  routes   RouteOffer[]
+}
+
+model RiderProfile {
+  userId    String   @id
+  rating    Float?   @default(5.0)
+  createdAt DateTime @default(now())
+
+  user     User      @relation(fields: [userId], references: [id])
+  bookings Booking[]
+}
+
+model Vehicle {
+  id        String       @id @default(cuid())
+  driverId  String
+  make      String
+  model     String
+  plate     String
+  color     String
+  seats     Int
+  createdAt DateTime     @default(now())
+
+  driver DriverProfile @relation(fields: [driverId], references: [userId])
+}
+
+model Station {
+  id        String   @id @default(cuid())
+  name      String
+  lat       Float
+  lng       Float
+  city      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Back-relations for routes and bookings
+  routeOffersStart RouteOffer[] @relation("StartStation")
+  routeOffersEnd   RouteOffer[] @relation("EndStation")
+  bookingsPickup   Booking[]    @relation("PickupStation")
+  bookingsDropoff  Booking[]    @relation("DropoffStation")
+
+  @@index([active, city])
+}
+
+model RouteOffer {
+  id                String            @id @default(cuid())
+  driverId          String
+  startStationId    String?
+  endStationId      String?
+  startLat          Float
+  startLng          Float
+  endLat            Float
+  endLng            Float
+  polyline          String
+  polylineSimplified Json
+  departureTime     DateTime
+  flexMinutes       Int
+  capacityTotal     Int
+  capacityAvailable Int
+  maxDetourMinutes  Int              @default(0)
+  pickupMode        PickupMode       @default(STATIONS)
+  status            RouteOfferStatus @default(DRAFT)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  driver        DriverProfile @relation(fields: [driverId], references: [userId])
+  startStation  Station?      @relation("StartStation", fields: [startStationId], references: [id])
+  endStation    Station?      @relation("EndStation", fields: [endStationId], references: [id])
+  executionTrip RouteExecutionTrip?
+  bookings      Booking[]
+  chatMessages  ChatMessage[]
+
+  @@index([status, departureTime])
+}
+
+model RouteExecutionTrip {
+  id           String          @id @default(cuid())
+  routeOfferId String          @unique
+  status       ExecutionStatus @default(NOT_STARTED)
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  routeOffer RouteOffer @relation(fields: [routeOfferId], references: [id])
+}
+
+model Booking {
+  id               String         @id @default(cuid())
+  routeOfferId     String
+  riderId          String
+  seatsRequested   Int
+  pickupStationId  String?
+  dropoffStationId String?
+  pickupLat        Float?
+  pickupLng        Float?
+  dropoffLat       Float?
+  dropoffLng       Float?
+  pickupPosMeters  Float
+  dropoffPosMeters Float
+  status           BookingStatus  @default(REQUESTED)
+  priceCents       Int
+  currency         String
+  pinCode          String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  routeOffer RouteOffer  @relation(fields: [routeOfferId], references: [id])
+  rider      RiderProfile @relation(fields: [riderId], references: [userId])
+  pickupStation  Station? @relation("PickupStation", fields: [pickupStationId], references: [id])
+  dropoffStation Station? @relation("DropoffStation", fields: [dropoffStationId], references: [id])
+  payment    Payment?
+  chatMsgs   ChatMessage[]
+
+  @@index([routeOfferId, status])
+  @@index([riderId, createdAt])
+}
+
+model TripEvent {
+  id         String     @id @default(cuid())
+  entityType EntityType
+  entityId   String
+  type       String
+  payload    Json
+  createdAt  DateTime   @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  bookingId   String        @unique
+  method      PaymentMethod
+  status      PaymentStatus
+  amountCents Int
+  currency    String
+  providerRef String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+}
+
+model Wallet {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  balanceCents Int      @default(0)
+  currency     String
+  updatedAt    DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  txns  WalletTxn[]
+}
+
+model WalletTxn {
+  id          String        @id @default(cuid())
+  walletId    String
+  type        WalletTxnType
+  amountCents Int
+  refType     String
+  refId       String
+  createdAt   DateTime      @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  routeOfferId String
+  bookingId   String?
+  senderId    String
+  message     String
+  createdAt   DateTime @default(now())
+
+  sender User      @relation("UserChatMessages", fields: [senderId], references: [id])
+  route  RouteOffer @relation(fields: [routeOfferId], references: [id])
+  booking Booking?  @relation(fields: [bookingId], references: [id])
+}
+
+model OTP {
+  phone     String   @id
+  code      String
+  expiresAt DateTime
+}

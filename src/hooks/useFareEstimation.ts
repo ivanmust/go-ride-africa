@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { GOOGLE_MAPS_API_KEY } from "@/components/maps/GoogleMapsProvider";
 
 interface Coordinates {
   lat: number;
@@ -43,24 +42,34 @@ export const useFareEstimation = (
       return;
     }
 
+    const pickupLat = Number(pickup.lat);
+    const pickupLng = Number(pickup.lng);
+    const destLat = Number(destination.lat);
+    const destLng = Number(destination.lng);
+
+    if (
+      !Number.isFinite(pickupLat) ||
+      !Number.isFinite(pickupLng) ||
+      !Number.isFinite(destLat) ||
+      !Number.isFinite(destLng)
+    ) {
+      console.warn("Skipping fare estimation due to invalid coordinates", { pickup, destination });
+      setFareEstimate(null);
+      return;
+    }
+
     const calculateFare = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Use Distance Matrix API
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${pickup.lat},${pickup.lng}&destinations=${destination.lat},${destination.lng}&key=${GOOGLE_MAPS_API_KEY}`
-        );
-
-        // Note: Direct API calls from browser will be blocked by CORS
-        // We'll use the geometry library for distance calculation instead
+        // Use the Google Maps geometry library for distance calculation (no direct HTTP call to Distance Matrix API)
         if (!window.google?.maps?.geometry) {
           throw new Error("Google Maps geometry library not loaded");
         }
 
-        const pickupLatLng = new google.maps.LatLng(pickup.lat, pickup.lng);
-        const destLatLng = new google.maps.LatLng(destination.lat, destination.lng);
+        const pickupLatLng = new google.maps.LatLng(pickupLat, pickupLng);
+        const destLatLng = new google.maps.LatLng(destLat, destLng);
         
         // Calculate straight-line distance and multiply by 1.3 for road factor
         const distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(

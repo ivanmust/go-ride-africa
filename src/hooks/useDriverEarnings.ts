@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useDriverAuth } from "@/apps/driver/auth/DriverAuthContext";
+import { api } from "@/shared";
 import { startOfWeek, endOfWeek, format, subDays } from 'date-fns';
 
 export interface DailyEarning {
@@ -38,7 +38,7 @@ export interface EarningsStats {
 }
 
 export const useDriverEarnings = () => {
-  const { user } = useAuth();
+  const { user } = useDriverAuth();
   const [dailyEarnings, setDailyEarnings] = useState<DailyEarning[]>([]);
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [stats, setStats] = useState<EarningsStats>({
@@ -58,62 +58,39 @@ export const useDriverEarnings = () => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-
-    // Fetch daily earnings for the last 30 days
     const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd');
-    
-    const { data: earningsData, error: earningsError } = await supabase
-      .from('driver_earnings')
-      .select('*')
-      .eq('driver_id', user.id)
-      .gte('date', thirtyDaysAgo)
-      .order('date', { ascending: false });
 
-    if (!earningsError && earningsData) {
+    const [earningsRes, payoutsRes] = await Promise.all([
+      api.get<DailyEarning[]>('/driver-earnings'),
+      api.get<Payout[]>('/driver-earnings/payouts'),
+    ]);
+    const earningsData = !earningsRes.error && earningsRes.data
+      ? earningsRes.data.filter((e: { date: string }) => e.date >= thirtyDaysAgo)
+      : null;
+    const payoutsData = !payoutsRes.error && payoutsRes.data ? payoutsRes.data : null;
+
+    if (earningsData) {
       setDailyEarnings(earningsData);
-
-      // Calculate stats
-      const todayData = earningsData.find(e => e.date === today);
-      const weeklyData = earningsData.filter(e => e.date >= weekStart && e.date <= weekEnd);
-
-      const weeklyEarnings = weeklyData.reduce((sum, e) => sum + Number(e.net_earnings), 0);
-      const weeklyTrips = weeklyData.reduce((sum, e) => sum + e.trips_count, 0);
-      const weeklyCommission = weeklyData.reduce((sum, e) => sum + Number(e.commission_amount), 0);
-
-      setStats(prev => ({
+      const todayData = earningsData.find((e) => e.date === today);
+      const weeklyData = earningsData.filter((e) => e.date >= weekStart && e.date <= weekEnd);
+      const todayEarnings = todayData ? Number(todayData.net_earnings) : 0;
+      const todayTrips = todayData != null && todayData.trips_count != null ? Number(todayData.trips_count) : 0;
+      setStats((prev) => ({
         ...prev,
-        todayEarnings: todayData ? Number(todayData.net_earnings) : 0,
-        todayTrips: todayData ? todayData.trips_count : 0,
-        weeklyEarnings,
-        weeklyTrips,
-        weeklyCommission,
+        todayEarnings: Number.isFinite(todayEarnings) ? todayEarnings : 0,
+        todayTrips: Number.isInteger(todayTrips) && todayTrips >= 0 ? todayTrips : 0,
+        weeklyEarnings: weeklyData.reduce((sum, e) => sum + Number(e.net_earnings || 0), 0),
+        weeklyTrips: weeklyData.reduce((sum, e) => sum + Number(e.trips_count || 0), 0),
+        weeklyCommission: weeklyData.reduce((sum, e) => sum + Number(e.commission_amount || 0), 0),
       }));
     }
 
-    // Fetch payouts
-    const { data: payoutsData, error: payoutsError } = await supabase
-      .from('driver_payouts')
-      .select('*')
-      .eq('driver_id', user.id)
-      .order('requested_at', { ascending: false })
-      .limit(20);
-
-    if (!payoutsError && payoutsData) {
+    if (payoutsData) {
       setPayouts(payoutsData);
-
-      // Calculate pending payout amount
-      const pendingAmount = payoutsData
-        .filter(p => p.status === 'pending')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
-
-      // Calculate available balance (total net earnings - processed payouts)
-      const processedPayouts = payoutsData
-        .filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
-
-      const totalNetEarnings = dailyEarnings.reduce((sum, e) => sum + Number(e.net_earnings), 0);
-
-      setStats(prev => ({
+      const pendingAmount = payoutsData.filter((p) => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const processedPayouts = payoutsData.filter((p) => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const totalNetEarnings = (earningsData ?? []).reduce((sum, e) => sum + Number(e.net_earnings || 0), 0);
+      setStats((prev) => ({
         ...prev,
         pendingPayout: pendingAmount,
         availableBalance: Math.max(0, totalNetEarnings - processedPayouts - pendingAmount),
@@ -125,27 +102,19 @@ export const useDriverEarnings = () => {
 
   const requestPayout = async (amount: number, provider: string, phoneNumber: string) => {
     if (!user) return { error: new Error('Not authenticated') };
-
-    const { error } = await supabase
-      .from('driver_payouts')
-      .insert({
-        driver_id: user.id,
-        amount,
-        payout_method: 'mobile_money',
-        mobile_money_provider: provider,
-        mobile_money_number: phoneNumber,
-        status: 'pending',
-      });
-
-    if (!error) {
-      await fetchEarnings();
-    }
-
-    return { error };
+    const { error } = await api.post('/driver-earnings/payouts', {
+      amount,
+      payout_method: 'mobile_money',
+      mobile_money_provider: provider,
+      mobile_money_number: phoneNumber,
+    });
+    if (!error) await fetchEarnings();
+    return { error: error ? new Error(error.message) : undefined };
   };
 
   useEffect(() => {
     fetchEarnings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchEarnings identity would cause extra runs
   }, [user]);
 
   return {

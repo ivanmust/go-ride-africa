@@ -77,6 +77,7 @@ export const MapboxMap = ({
       map.current?.remove();
       map.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- init map once per token; defaultCenter is initial only
   }, [token, onMapClick]);
 
   // Update pickup marker

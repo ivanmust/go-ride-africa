@@ -1,9 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useContext } from "react";
 import { X, Send, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { PassengerAuthContext } from "@/apps/passenger/auth/PassengerAuthContext";
+import { DriverAuthContext } from "@/apps/driver/auth/DriverAuthContext";
 import { format } from "date-fns";
+
+/** Use auth from whichever app we're in (passenger or driver). */
+function useRideChatAuth() {
+  const passenger = useContext(PassengerAuthContext);
+  const driver = useContext(DriverAuthContext);
+  return driver ?? passenger;
+}
 
 interface Message {
   id: string;
@@ -23,6 +31,11 @@ interface RideChatDrawerProps {
   isSending: boolean;
   isLoading: boolean;
   driverName?: string;
+  /**
+   * If true, the current user is treated as the driver side of the chat.
+   * This only affects labels and who is considered the "other party".
+   */
+  isDriverView?: boolean;
 }
 
 export const RideChatDrawer = ({
@@ -33,8 +46,10 @@ export const RideChatDrawer = ({
   isSending,
   isLoading,
   driverName = "Driver",
+  isDriverView = false,
 }: RideChatDrawerProps) => {
-  const { user } = useAuth();
+  const auth = useRideChatAuth();
+  const user = auth?.user ?? null;
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,7 +117,9 @@ export const RideChatDrawer = ({
             </div>
             <div>
               <h3 className="font-semibold text-foreground">{driverName}</h3>
-              <p className="text-xs text-muted-foreground">Your driver</p>
+              <p className="text-xs text-muted-foreground">
+                {isDriverView ? "Your passenger" : "Your driver"}
+              </p>
             </div>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -127,7 +144,11 @@ export const RideChatDrawer = ({
           ) : (
             <>
               {messages.map((message) => {
-                const isOwnMessage = message.sender_id === user?.id;
+                // For passenger view, "own" is the logged-in passenger.
+                // For driver view, "own" is messages sent by sender_type === 'driver'.
+                const isOwnMessage = isDriverView
+                  ? message.sender_type === "driver"
+                  : message.sender_id === user?.id;
                 return (
                   <div
                     key={message.id}

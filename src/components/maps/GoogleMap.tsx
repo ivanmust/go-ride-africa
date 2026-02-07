@@ -1,10 +1,18 @@
 import { useCallback, useRef, useState, useEffect } from "react";
-import { GoogleMap as GoogleMapComponent, Marker, DirectionsRenderer } from "@react-google-maps/api";
+import { GoogleMap as GoogleMapComponent, DirectionsRenderer } from "@react-google-maps/api";
+
+export interface NearbyDriverMarker {
+  driverId: string;
+  latitude: number;
+  longitude: number;
+}
 
 interface GoogleMapProps {
   pickup?: { lat: number; lng: number } | null;
   destination?: { lat: number; lng: number } | null;
   driverLocation?: { lat: number; lng: number } | null;
+  /** Approved drivers to show on map (only authorized drivers) */
+  nearbyDrivers?: NearbyDriverMarker[];
   showRoute?: boolean;
   className?: string;
   onMapClick?: (coords: { lat: number; lng: number }) => void;
@@ -21,37 +29,53 @@ const defaultCenter = {
   lng: 30.0619,
 };
 
+// Use Map ID from env so Advanced Markers are fully enabled
+const MAP_ID = (import.meta.env.VITE_GOOGLE_MAP_ID as string | undefined) || undefined;
+
 const mapOptions: google.maps.MapOptions = {
+  ...(MAP_ID && { mapId: MAP_ID }),
   disableDefaultUI: false,
   zoomControl: true,
   streetViewControl: false,
   mapTypeControl: false,
   fullscreenControl: false,
-  styles: [
-    {
-      featureType: "poi",
-      elementType: "labels",
-      stylers: [{ visibility: "off" }],
-    },
-  ],
 };
+
+type AdvancedMarker = google.maps.marker.AdvancedMarkerElement;
 
 export const GoogleMap = ({
   pickup,
   destination,
   driverLocation,
+  nearbyDrivers = [],
   showRoute = false,
   className = "",
   onMapClick,
 }: GoogleMapProps) => {
   const mapRef = useRef<google.maps.Map | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const pickupMarkerRef = useRef<AdvancedMarker | null>(null);
+  const destinationMarkerRef = useRef<AdvancedMarker | null>(null);
+  const driverMarkerRef = useRef<AdvancedMarker | null>(null);
+  const nearbyMarkersRef = useRef<Map<string, AdvancedMarker>>(new Map());
 
   const onLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
   }, []);
 
   const onUnmount = useCallback(() => {
+    const clearMarker = (m: AdvancedMarker | null) => {
+      if (!m) return;
+      m.map = null;
+    };
+    clearMarker(pickupMarkerRef.current);
+    pickupMarkerRef.current = null;
+    clearMarker(destinationMarkerRef.current);
+    destinationMarkerRef.current = null;
+    clearMarker(driverMarkerRef.current);
+    driverMarkerRef.current = null;
+    nearbyMarkersRef.current.forEach(clearMarker);
+    nearbyMarkersRef.current.clear();
     mapRef.current = null;
   }, []);
 
@@ -67,6 +91,99 @@ export const GoogleMap = ({
     [onMapClick]
   );
 
+  // Advanced markers (always use AdvancedMarkerElement; avoids google.maps.Marker deprecation)
+  type MarkerOptions = { pin: google.maps.marker.PinElementOptions; label: { text: string; color: string } };
+  const updateMarker = useCallback(
+    (markerRef: React.MutableRefObject<AdvancedMarker | null>, position: { lat: number; lng: number } | null, options: MarkerOptions) => {
+      if (!mapRef.current) return;
+
+      if (!position) {
+        const m = markerRef.current;
+        if (m) {
+          m.map = null;
+          markerRef.current = null;
+        }
+        return;
+      }
+
+      const lat = Number(position.lat);
+      const lng = Number(position.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.warn("Skipping marker with invalid position", position);
+        return;
+      }
+
+      if (!google.maps?.marker?.AdvancedMarkerElement) {
+        console.warn("AdvancedMarkerElement not available on google.maps.marker");
+        return;
+      }
+
+      const markerLib = google.maps.marker;
+      const pin = new markerLib.PinElement(options.pin);
+      const adv = markerRef.current as AdvancedMarker | null;
+      if (!adv) {
+        markerRef.current = new markerLib.AdvancedMarkerElement({
+          map: mapRef.current,
+          position: { lat, lng },
+          content: pin,
+        });
+      } else {
+        adv.position = { lat, lng };
+        adv.content = pin;
+        adv.map = mapRef.current;
+      }
+    },
+    []
+  );
+
+  const pickupOpts: MarkerOptions = { pin: { background: "#22c55e", glyphColor: "#ffffff", borderColor: "#166534", scale: 1.2 }, label: { text: "P", color: "white" } };
+  const destOpts: MarkerOptions = { pin: { background: "#f97316", glyphColor: "#ffffff", borderColor: "#ffffff", scale: 1.1 }, label: { text: "D", color: "white" } };
+  const driverOpts: MarkerOptions = { pin: { glyphText: "🚗", glyphColor: "#ffffff", background: "#0f172a", borderColor: "#f0fdfa", scale: 1.2 }, label: { text: "C", color: "white" } };
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    updateMarker(pickupMarkerRef, pickup ?? null, pickupOpts);
+    updateMarker(destinationMarkerRef, destination ?? null, destOpts);
+    updateMarker(driverMarkerRef, driverLocation ?? null, driverOpts);
+  }, [pickup, destination, driverLocation, updateMarker]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const markers = nearbyMarkersRef.current;
+    const activeIds = new Set<string>();
+
+    if (!google.maps?.marker?.AdvancedMarkerElement) {
+      console.warn("AdvancedMarkerElement not available on google.maps.marker");
+      return;
+    }
+
+    const markerLib = google.maps.marker;
+    nearbyDrivers.forEach((driver) => {
+      if (typeof driver.latitude !== "number" || typeof driver.longitude !== "number") return;
+      const driverPosition = { lat: driver.latitude, lng: driver.longitude };
+      activeIds.add(driver.driverId);
+      const pin = new markerLib.PinElement({ background: "#16a34a", glyphColor: "#ffffff", borderColor: "#14532d", scale: 0.9 });
+      let marker = markers.get(driver.driverId) as AdvancedMarker | undefined;
+      if (!marker) {
+        marker = new markerLib.AdvancedMarkerElement({ map: mapRef.current!, position: driverPosition, content: pin });
+        markers.set(driver.driverId, marker);
+      } else {
+        marker.position = driverPosition;
+        marker.content = pin;
+        marker.map = mapRef.current;
+      }
+    });
+
+    markers.forEach((marker, id) => {
+      if (!activeIds.has(id)) {
+        marker.map = null;
+        markers.delete(id);
+      }
+    });
+  }, [nearbyDrivers]);
+
   // Fit bounds when markers change
   useEffect(() => {
     if (!mapRef.current) return;
@@ -74,23 +191,31 @@ export const GoogleMap = ({
     const bounds = new google.maps.LatLngBounds();
     let hasMarkers = false;
 
-    if (pickup) {
-      bounds.extend({ lat: pickup.lat, lng: pickup.lng });
+    const extendIfValid = (coords?: { lat: number; lng: number } | null) => {
+      if (!coords) return;
+      const lat = Number(coords.lat);
+      const lng = Number(coords.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      bounds.extend({ lat, lng });
       hasMarkers = true;
-    }
+    };
 
-    if (destination) {
-      bounds.extend({ lat: destination.lat, lng: destination.lng });
+    const extendDriverIfValid = (driver: NearbyDriverMarker) => {
+      const lat = Number(driver.latitude);
+      const lng = Number(driver.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      bounds.extend({ lat, lng });
       hasMarkers = true;
-    }
+    };
 
-    if (driverLocation) {
-      bounds.extend({ lat: driverLocation.lat, lng: driverLocation.lng });
-      hasMarkers = true;
-    }
+    extendIfValid(pickup ?? null);
+    extendIfValid(destination ?? null);
+    extendIfValid(driverLocation ?? null);
+
+    nearbyDrivers.forEach(extendDriverIfValid);
 
     if (hasMarkers) {
-      if (pickup && !destination && !driverLocation) {
+      if (pickup && !destination && !driverLocation && nearbyDrivers.length === 0) {
         // Only pickup - center and zoom
         mapRef.current.setCenter({ lat: pickup.lat, lng: pickup.lng });
         mapRef.current.setZoom(15);
@@ -104,7 +229,7 @@ export const GoogleMap = ({
         });
       }
     }
-  }, [pickup, destination, driverLocation]);
+  }, [pickup, destination, driverLocation, nearbyDrivers]);
 
   // Draw route between pickup and destination
   useEffect(() => {
@@ -113,12 +238,28 @@ export const GoogleMap = ({
       return;
     }
 
+    const pickupLat = Number(pickup.lat);
+    const pickupLng = Number(pickup.lng);
+    const destLat = Number(destination.lat);
+    const destLng = Number(destination.lng);
+
+    if (
+      !Number.isFinite(pickupLat) ||
+      !Number.isFinite(pickupLng) ||
+      !Number.isFinite(destLat) ||
+      !Number.isFinite(destLng)
+    ) {
+      console.warn("Skipping route due to invalid coordinates", { pickup, destination });
+      setDirections(null);
+      return;
+    }
+
     const directionsService = new google.maps.DirectionsService();
 
     directionsService.route(
       {
-        origin: { lat: pickup.lat, lng: pickup.lng },
-        destination: { lat: destination.lat, lng: destination.lng },
+        origin: { lat: pickupLat, lng: pickupLng },
+        destination: { lat: destLat, lng: destLng },
         travelMode: google.maps.TravelMode.DRIVING,
       },
       (result, status) => {
@@ -143,57 +284,6 @@ export const GoogleMap = ({
         onClick={handleClick}
         options={mapOptions}
       >
-        {/* Pickup Marker */}
-        {pickup && (
-          <Marker
-            position={{ lat: pickup.lat, lng: pickup.lng }}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 12,
-              fillColor: "#22c55e",
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
-            }}
-            title="Pickup Location"
-          />
-        )}
-
-        {/* Destination Marker */}
-        {destination && (
-          <Marker
-            position={{ lat: destination.lat, lng: destination.lng }}
-            icon={{
-              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-              scale: 8,
-              fillColor: "#f59e0b",
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 2,
-              rotation: 180,
-            }}
-            title="Destination"
-          />
-        )}
-
-        {/* Driver Marker */}
-        {driverLocation && (
-          <Marker
-            position={{ lat: driverLocation.lat, lng: driverLocation.lng }}
-            icon={{
-              url: "data:image/svg+xml," + encodeURIComponent(`
-                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-                  <rect x="5" y="5" width="30" height="30" rx="8" fill="#1a1a1a" stroke="white" stroke-width="2"/>
-                  <path d="M14 24c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm12 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm-12-8l1.5-4.5h9L26 16H14z" fill="white"/>
-                </svg>
-              `),
-              scaledSize: new google.maps.Size(40, 40),
-              anchor: new google.maps.Point(20, 20),
-            }}
-            title="Driver"
-          />
-        )}
-
         {/* Route */}
         {directions && (
           <DirectionsRenderer

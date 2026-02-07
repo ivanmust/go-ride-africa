@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePassengerAuth } from "@/apps/passenger/auth/PassengerAuthContext";
+import { api } from "@/shared";
 import { toast } from "sonner";
 
 export interface SavedLocation {
@@ -14,7 +14,7 @@ export interface SavedLocation {
 }
 
 export const useSavedLocations = () => {
-  const { user } = useAuth();
+  const { user } = usePassengerAuth();
   const [locations, setLocations] = useState<SavedLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -24,15 +24,9 @@ export const useSavedLocations = () => {
       setIsLoading(false);
       return;
     }
-
     try {
-      const { data, error } = await supabase
-        .from("saved_locations")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const { data, error } = await api.get<SavedLocation[]>("/saved-locations");
+      if (error) throw new Error(error.message);
       setLocations(data || []);
     } catch (error) {
       console.error("Error fetching saved locations:", error);
@@ -43,6 +37,7 @@ export const useSavedLocations = () => {
 
   useEffect(() => {
     fetchLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchLocations identity would cause extra runs
   }, [user]);
 
   const saveLocation = async (location: {
@@ -58,21 +53,15 @@ export const useSavedLocations = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("saved_locations")
-        .insert({
-          user_id: user.id,
-          name: location.name,
-          address: location.address,
-          label: location.label || null,
-          latitude: location.latitude || null,
-          longitude: location.longitude || null,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
+      const { data, error } = await api.post<SavedLocation>("/saved-locations", {
+        name: location.name,
+        address: location.address,
+        label: location.label || null,
+        latitude: location.latitude ?? null,
+        longitude: location.longitude ?? null,
+      });
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("No data");
       setLocations((prev) => [data, ...prev]);
       toast.success(`${location.name} saved successfully`);
       return data;
@@ -87,14 +76,8 @@ export const useSavedLocations = () => {
     if (!user) return false;
 
     try {
-      const { error } = await supabase
-        .from("saved_locations")
-        .update(updates)
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
+      const { error } = await api.patch(`/saved-locations/${id}`, updates);
+      if (error) throw new Error(error.message);
       setLocations((prev) =>
         prev.map((loc) => (loc.id === id ? { ...loc, ...updates } : loc))
       );
@@ -111,14 +94,8 @@ export const useSavedLocations = () => {
     if (!user) return false;
 
     try {
-      const { error } = await supabase
-        .from("saved_locations")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-      if (error) throw error;
-
+      const { error } = await api.delete(`/saved-locations/${id}`);
+      if (error) throw new Error(error.message);
       setLocations((prev) => prev.filter((loc) => loc.id !== id));
       toast.success("Location deleted");
       return true;

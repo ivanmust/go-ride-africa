@@ -27,6 +27,12 @@ const statusConfig = {
     icon: CheckCircle,
     color: "text-green-600",
   },
+  rejected: {
+    label: "Rejected",
+    variant: "destructive" as const,
+    icon: XCircle,
+    color: "text-red-600",
+  },
   failed: {
     label: "Failed",
     variant: "destructive" as const,

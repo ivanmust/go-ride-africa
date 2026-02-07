@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePassengerAuth } from "@/apps/passenger/auth/PassengerAuthContext";
+import { api } from "@/shared";
 
 interface Message {
   id: string;
@@ -17,38 +17,27 @@ interface UseRideChatOptions {
   enabled?: boolean;
 }
 
+const POLL_INTERVAL_MS = 3000;
+
 export const useRideChat = ({ rideId, enabled = true }: UseRideChatOptions) => {
-  const { user } = useAuth();
+  const { user } = usePassengerAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch existing messages
   const fetchMessages = useCallback(async () => {
     if (!rideId || !enabled) return;
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("ride_messages")
-        .select("*")
-        .eq("ride_id", rideId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
-      
-      const typedMessages = (data || []).map(msg => ({
+      const { data, error } = await api.get<Message[]>(`/ride-messages?ride_id=${encodeURIComponent(rideId)}`);
+      if (error) throw new Error(error.message);
+      const typedMessages = (data || []).map((msg) => ({
         ...msg,
-        sender_type: msg.sender_type as "passenger" | "driver"
+        sender_type: msg.sender_type as "passenger" | "driver",
       }));
-      
       setMessages(typedMessages);
-      
-      // Count unread messages not from the current user
-      const unread = typedMessages.filter(
-        (m) => !m.is_read && m.sender_id !== user?.id
-      ).length;
+      const unread = typedMessages.filter((m) => !m.is_read && m.sender_id !== user?.id).length;
       setUnreadCount(unread);
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -57,21 +46,17 @@ export const useRideChat = ({ rideId, enabled = true }: UseRideChatOptions) => {
     }
   }, [rideId, enabled, user?.id]);
 
-  // Send a new message
   const sendMessage = useCallback(
     async (messageText: string) => {
       if (!rideId || !user?.id || !messageText.trim()) return false;
-
       setIsSending(true);
       try {
-        const { error } = await supabase.from("ride_messages").insert({
+        const { error } = await api.post("/ride-messages", {
           ride_id: rideId,
-          sender_id: user.id,
-          sender_type: "passenger",
           message: messageText.trim(),
+          sender_type: "passenger",
         });
-
-        if (error) throw error;
+        if (error) throw new Error(error.message);
         return true;
       } catch (error) {
         console.error("Error sending message:", error);
@@ -83,73 +68,29 @@ export const useRideChat = ({ rideId, enabled = true }: UseRideChatOptions) => {
     [rideId, user?.id]
   );
 
-  // Mark messages as read
   const markAsRead = useCallback(async () => {
     if (!rideId || !user?.id) return;
-
     const unreadMessageIds = messages
       .filter((m) => !m.is_read && m.sender_id !== user.id)
       .map((m) => m.id);
-
     if (unreadMessageIds.length === 0) return;
-
     try {
-      await supabase
-        .from("ride_messages")
-        .update({ is_read: true })
-        .in("id", unreadMessageIds);
-
+      await api.patch("/ride-messages/mark-read", { ride_id: rideId });
       setMessages((prev) =>
-        prev.map((m) =>
-          unreadMessageIds.includes(m.id) ? { ...m, is_read: true } : m
-        )
+        prev.map((m) => (unreadMessageIds.includes(m.id) ? { ...m, is_read: true } : m))
       );
       setUnreadCount(0);
-    } catch (error) {
-      console.error("Error marking messages as read:", error);
+    } catch (e) {
+      console.error("Error marking messages as read:", e);
     }
   }, [rideId, user?.id, messages]);
 
-  // Subscribe to real-time updates
   useEffect(() => {
     if (!rideId || !enabled) return;
-
     fetchMessages();
-
-    const channel = supabase
-      .channel(`ride-chat-${rideId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "ride_messages",
-          filter: `ride_id=eq.${rideId}`,
-        },
-        (payload) => {
-          const newMessage = {
-            ...payload.new,
-            sender_type: payload.new.sender_type as "passenger" | "driver"
-          } as Message;
-          
-          setMessages((prev) => {
-            // Avoid duplicates
-            if (prev.some((m) => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
-
-          // Update unread count if message is from someone else
-          if (newMessage.sender_id !== user?.id) {
-            setUnreadCount((prev) => prev + 1);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [rideId, enabled, fetchMessages, user?.id]);
+    const interval = setInterval(fetchMessages, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [rideId, enabled, fetchMessages]);
 
   return {
     messages,

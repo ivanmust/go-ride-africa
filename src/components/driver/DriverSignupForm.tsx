@@ -16,7 +16,8 @@ export const DriverSignupForm = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/auth?type=driver");
+    // Driver app: go to driver login/signup (same app)
+    navigate("/login");
   };
 
   return (

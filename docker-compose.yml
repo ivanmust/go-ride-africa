@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: goride-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ride_sharing
+    ports:
+      - "5433:5433"
+    volumes:
+      - goride_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ride_sharing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: goride-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - goride_redis_data:/data
+
+volumes:
+  goride_pg_data:
+  goride_redis_data:

@@ -23,6 +23,13 @@ interface AddressAutocompleteProps {
   className?: string;
 }
 
+type MapboxFeature = {
+  id: string;
+  text: string;
+  place_name: string;
+  center: [number, number];
+};
+
 export const AddressAutocomplete = ({
   value,
   onChange,
@@ -81,13 +88,15 @@ export const AddressAutocomplete = ({
 
       const data = await response.json();
       
-      const mappedResults: AddressResult[] = data.features.map((feature: any) => ({
-        id: feature.id,
-        placeName: feature.text,
-        address: feature.place_name,
-        lat: feature.center[1],
-        lng: feature.center[0],
-      }));
+      const mappedResults: AddressResult[] = (data.features as MapboxFeature[])
+        .filter((feature): feature is MapboxFeature => Array.isArray(feature.center) && feature.center.length === 2)
+        .map((feature) => ({
+          id: feature.id,
+          placeName: feature.text,
+          address: feature.place_name,
+          lat: feature.center[1],
+          lng: feature.center[0],
+        }));
 
       setResults(mappedResults);
       setShowDropdown(mappedResults.length > 0);

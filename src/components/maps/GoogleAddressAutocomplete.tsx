@@ -22,6 +22,13 @@ interface GoogleAddressAutocompleteProps {
   className?: string;
 }
 
+type AutocompleteResult = {
+  id: string;
+  placeName: string;
+  address: string;
+  suggestion: google.maps.places.AutocompleteSuggestion;
+};
+
 export const GoogleAddressAutocomplete = ({
   value,
   onChange,
@@ -33,24 +40,50 @@ export const GoogleAddressAutocomplete = ({
   isLocating = false,
   className,
 }: GoogleAddressAutocompleteProps) => {
-  const [results, setResults] = useState<AddressResult[]>([]);
+  const [results, setResults] = useState<AutocompleteResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const placesLibraryRef = useRef<google.maps.PlacesLibrary | null>(null);
+  const sessionTokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
+  const latestRequestRef = useRef<number>(0);
 
-  // Initialize services
-  useEffect(() => {
-    if (typeof google !== "undefined" && google.maps && google.maps.places) {
-      autocompleteService.current = new google.maps.places.AutocompleteService();
-      // Create a dummy div for PlacesService (required by the API)
-      const dummyDiv = document.createElement("div");
-      placesService.current = new google.maps.places.PlacesService(dummyDiv);
+  const createSessionToken = useCallback(() => {
+    if (placesLibraryRef.current) {
+      sessionTokenRef.current = new placesLibraryRef.current.AutocompleteSessionToken();
     }
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializePlacesLibrary = async () => {
+      if (typeof google === "undefined" || !google.maps?.importLibrary) {
+        return;
+      }
+
+      try {
+        const placesLibrary = (await google.maps.importLibrary("places")) as google.maps.PlacesLibrary;
+        if (!isMounted) return;
+
+        placesLibraryRef.current = placesLibrary;
+        createSessionToken();
+      } catch (error) {
+        console.error("Failed to load Google Places library:", error);
+      }
+    };
+
+    initializePlacesLibrary();
+
+    return () => {
+      isMounted = false;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [createSessionToken]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -64,47 +97,80 @@ export const GoogleAddressAutocomplete = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const searchAddresses = useCallback(async (query: string) => {
-    if (!autocompleteService.current || query.length < 3) {
-      setResults([]);
-      return;
-    }
+  const searchAddresses = useCallback(
+    async (query: string) => {
+      if (!placesLibraryRef.current || query.trim().length < 3) {
+        setResults([]);
+        setShowDropdown(false);
+        setIsLoading(false);
+        return;
+      }
 
-    setIsLoading(true);
-    try {
-      // Kigali, Rwanda coordinates for biasing
-      const kigaliLocation = new google.maps.LatLng(-1.9441, 30.0619);
+      setIsLoading(true);
+      const requestId = Date.now();
+      latestRequestRef.current = requestId;
 
-      autocompleteService.current.getPlacePredictions(
-        {
+      const kigaliOrigin: google.maps.LatLngLiteral = { lat: -1.9441, lng: 30.0619 };
+      const kigaliRestriction: google.maps.places.LocationRestriction = {
+        south: -2.2,
+        west: 29.9,
+        north: -1.7,
+        east: 30.35,
+      };
+
+      try {
+        if (!sessionTokenRef.current) {
+          createSessionToken();
+        }
+
+        const { AutocompleteSuggestion } = placesLibraryRef.current;
+        const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
           input: query,
-          location: kigaliLocation,
-          radius: 50000, // 50km radius around Kigali
-          componentRestrictions: { country: "rw" },
-        },
-        (predictions, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
-            const mappedResults: AddressResult[] = predictions.map((prediction) => ({
-              id: prediction.place_id,
-              placeName: prediction.structured_formatting.main_text,
-              address: prediction.description,
-              lat: 0, // Will be fetched when selected
-              lng: 0,
-            }));
-            setResults(mappedResults);
-            setShowDropdown(mappedResults.length > 0);
-          } else {
-            setResults([]);
-          }
+          origin: kigaliOrigin,
+          includedRegionCodes: ["RW"],
+          locationRestriction: kigaliRestriction,
+          region: "rw",
+          sessionToken: sessionTokenRef.current ?? undefined,
+        });
+
+        if (latestRequestRef.current !== requestId) {
+          return;
+        }
+
+        const mappedResults: AutocompleteResult[] = response.suggestions
+          .filter((suggestion) => suggestion.placePrediction?.placeId)
+          .map((suggestion) => {
+            const prediction = suggestion.placePrediction!;
+            const mainText = prediction.mainText?.text ?? prediction.text?.text ?? "";
+            const secondaryText = prediction.secondaryText?.text ?? "";
+            const composedAddress =
+              prediction.text?.text ??
+              (secondaryText ? `${mainText}, ${secondaryText}` : mainText);
+
+            return {
+              id: prediction.placeId!,
+              placeName: mainText || composedAddress,
+              address: composedAddress,
+              suggestion,
+            };
+          });
+
+        setResults(mappedResults);
+        setShowDropdown(mappedResults.length > 0);
+      } catch (error) {
+        console.error("Address search error:", error);
+        if (latestRequestRef.current === requestId) {
+          setResults([]);
+          setShowDropdown(false);
+        }
+      } finally {
+        if (latestRequestRef.current === requestId) {
           setIsLoading(false);
         }
-      );
-    } catch (error) {
-      console.error("Address search error:", error);
-      setResults([]);
-      setIsLoading(false);
-    }
-  }, []);
+      }
+    },
+    [createSessionToken]
+  );
 
   const handleInputChange = (newValue: string) => {
     onChange(newValue);
@@ -118,30 +184,46 @@ export const GoogleAddressAutocomplete = ({
     }, 300);
   };
 
-  const handleSelect = (result: AddressResult) => {
-    if (!placesService.current) return;
+  const handleSelect = useCallback(
+    async (result: AutocompleteResult) => {
+      const prediction = result.suggestion.placePrediction;
+      if (!prediction) return;
 
-    // Get place details to retrieve coordinates
-    placesService.current.getDetails(
-      {
-        placeId: result.id,
-        fields: ["geometry"],
-      },
-      (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
-          const fullResult: AddressResult = {
-            ...result,
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          };
-          onChange(result.address);
-          onSelect(fullResult);
-          setShowDropdown(false);
-          setResults([]);
+      try {
+        setIsLoading(true);
+
+        const place = prediction.toPlace();
+        const { place: placeDetails } = await place.fetchFields({
+          fields: ["id", "displayName", "formattedAddress", "location"],
+        });
+
+        const location = placeDetails.location;
+        if (!location) {
+          console.warn("No location returned for place prediction", prediction.placeId);
+          return;
         }
+
+        const finalResult: AddressResult = {
+          id: placeDetails.id ?? result.id,
+          placeName: placeDetails.displayName ?? result.placeName,
+          address: placeDetails.formattedAddress ?? result.address,
+          lat: location.lat(),
+          lng: location.lng(),
+        };
+
+        onChange(finalResult.address);
+        onSelect(finalResult);
+        setShowDropdown(false);
+        setResults([]);
+        createSessionToken();
+      } catch (error) {
+        console.error("Failed to fetch place details:", error);
+      } finally {
+        setIsLoading(false);
       }
-    );
-  };
+    },
+    [createSessionToken, onChange, onSelect]
+  );
 
   const handleFocus = () => {
     if (results.length > 0) {
@@ -195,7 +277,7 @@ export const GoogleAddressAutocomplete = ({
             <button
               key={result.id}
               type="button"
-              onClick={() => handleSelect(result)}
+              onClick={() => void handleSelect(result)}
               className="w-full flex items-start gap-3 p-3 hover:bg-secondary transition-colors text-left"
             >
               <div className="mt-1">
